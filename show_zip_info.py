@@ -9,8 +9,6 @@
 Fetch BDR item and gather zip file data for item and children.
 """
 
-from __future__ import annotations
-
 import argparse
 import sys
 from collections.abc import Callable
