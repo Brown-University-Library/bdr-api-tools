@@ -83,6 +83,7 @@ Output (bdr:833705 excerpt):
 
 import argparse
 import functools
+import json
 import sys
 from collections import Counter
 from collections.abc import Callable
@@ -231,8 +232,6 @@ def main(argv: list[str] | None = None) -> int:
 
     # print the final structure as JSON
     try:
-        import json
-
         print(json.dumps(result, indent=2, ensure_ascii=False))
     except Exception:
         # last-resort repr so failures never mask core logic
