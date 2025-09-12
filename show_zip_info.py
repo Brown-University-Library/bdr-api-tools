@@ -6,29 +6,105 @@
 # ///
 
 """
-Fetches BDR item-api data and gathers zip file data for item and children.
+Fetches BDR item-api data and extracts and summarizes zip file data for item and and any hasParts children.
+
+Usage:
+  uv run ./show_zip_info.py --item_pid bdr:833705  # item with hasParts child-items
+  uv run ./show_zip_info.py --item_pid bdr:841254  # item with no hasParts child-items
+  uv run ./show_zip_info.py --item_pid bdr:417934  # item with no zip data
+
+Output (bdr:833705 excerpt):
+{
+  "_meta_": {
+    "timestamp": "2025-09-11T22:56:48.249463-04:00",
+    "full_item_api_url": "https://repository.library.brown.edu/api/items/bdr:833705/",
+    "item_pid": "bdr:833705"
+  },
+  "item_info": {
+    "pid": "bdr:833705",
+    "primary_title": "(ATOMICS-0) Adjudicated/Annotated Telemetry Signals for Medically Important and Clinically Significant Events-0 Dataset",
+    "item_zip_info": [
+      "ATOMICS-0/ATOMICS-0-Data-Catalog-Record-2018.pdf",
+      "ATOMICS-0/README.md"
+    ],
+    "item_zip_filetype_summary": {
+      "md": 1,
+      "pdf": 1
+    },
+    "has_parts_zip_info": [
+      {
+        "child_pid": "bdr:841254",
+        "primary_title": "ATOMICS SHARED CODE",
+        "child_zip_info": [
+          "__MACOSX/x1. ATOMICS shared code/._III+ ATOMICS_dataset_window_processor.py",
+          "__MACOSX/x1. ATOMICS shared code/._III+ ATOMICS_dataset_window_processorSLC.py",
+          "x1. ATOMICS shared code/III+ ATOMICS_dataset_window_processor.py",
+          "x1. ATOMICS shared code/III+ ATOMICS_dataset_window_processorSLC.py"
+        ],
+        "child_zip_filetype_summary": {
+          "py": 4
+        }
+      },
+      {
+        "child_pid": "bdr:841252",
+        "primary_title": "ATOMICS-0 SHARE ALL",
+        "child_zip_info": [
+          "ATOMICS_0_share_ALL/+ATOMICS dataset descriptions and use instructions v1.0.doc",
+          "ATOMICS_0_share_ALL/.DS_Store",
+          "ATOMICS_0_share_ALL/PERSEUS+MeTeOR EULA.pdf",
+          "ATOMICS_0_share_ALL/select latched controls from ATOMICS-2 dataset.txt",
+          "ATOMICS_0_share_ALL/week02_day01_alarmsSLC/x00-86.2015-08-15_alarmsSLC.csv",
+          "ATOMICS_0_share_ALL/week02_day01_alarmsSLC/x00-89.2015-08-15_alarmsSLC.csv",
+<snip>
+        ],
+        "child_zip_filetype_summary": {
+        "csv": 320,
+        "doc": 1,
+        "ds_store": 2,
+        "pdf": 2,
+        "py": 4,
+        "txt": 194
+        }
+      }
+    ],
+<snip>
+    "overall_zip_filetype_summary": {
+      "csv": 600,
+      "doc": 1,
+      "ds_store": 14,
+      "md": 1,
+      "pdf": 15,
+      "py": 8,
+      "txt": 363
+    }
+  }
+}
 """
 
 import argparse
+import functools
 import sys
-from collections.abc import Callable
 from collections import Counter
+from collections.abc import Callable
+from datetime import datetime
 from typing import Any
 
 import httpx
-import functools
-from datetime import datetime
 
 BDR_ITEM_API_TEMPLATE = 'https://repository.library.brown.edu/api/items/{pid}/'
 
 
 def build_item_url(pid: str) -> str:
-    """Build item url."""
+    """
+    Builds item url.
+    """
     return BDR_ITEM_API_TEMPLATE.format(pid=pid)
 
 
 def fetch_item_json(client: httpx.Client, item_pid: str) -> dict[str, Any]:
-    """Fetch item json from bdr api."""
+    """
+    Fetches item json from bdr api.
+    """
     url = build_item_url(item_pid)
     resp = client.get(url, timeout=httpx.Timeout(15.0))
     resp.raise_for_status()
@@ -40,7 +116,7 @@ def parse_item_zip_info(
     fetcher: Callable[[str], dict[str, Any]],
 ) -> dict[str, Any]:
     """
-    Parse an item JSON for top-level zip list and each child's zip list.
+    Parses an item JSON for top-level zip list and each child's zip list.
 
     - looks for top-level 'zip_filelist_ssim'
     - looks for children under either top-level 'hasPart' or 'relations' -> 'hasPart'
@@ -116,7 +192,7 @@ def parse_item_zip_info(
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """
-    Parse cli args.
+    Parses cli args.
     """
     parser = argparse.ArgumentParser(
         description='Fetch BDR item and gather zip file lists for item and children.'
@@ -131,7 +207,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     """
-    Main manager.
+    Manages main execution.
     """
     args = parse_args(argv)
 
