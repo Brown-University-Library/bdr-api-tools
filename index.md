@@ -1,6 +1,4 @@
-Collection of small utilities, easily run from anywhere via the wonderful package, `uv` ([link](https://docs.astral.sh/uv/)).
-
-_(In usage examples below, where a line ends in a backslash, that backslash is used to break the line into multiple lines for readability. The backslash is not part of the command. It can be removed and the command can be run as a single line.)_
+Collection of small utilities, easily run from anywhere via the wonderful python package-manager, `uv` ([link](https://docs.astral.sh/uv/)).
 
 ---
 
