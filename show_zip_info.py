@@ -68,6 +68,7 @@ def parse_item_zip_info(
                 has_parts_info.append(
                     {
                         'child_pid': child_pid,
+                        'primary_title': str(child_json.get('primary_title', '')),
                         'child_zip_info': child_zip_list,
                     }
                 )
@@ -104,6 +105,7 @@ def parse_item_zip_info(
         },
         'item_info': {
             'pid': pid,
+            'primary_title': str(item_json.get('primary_title', '')),
             'item_zip_info': item_zip_info,
             'item_zip_filetype_summary': item_zip_filetype_summary,
             'has_parts_zip_info': has_parts_info,
