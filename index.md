@@ -11,13 +11,17 @@ Calculates the size of a collection in the Brown Digital Repository.
 
 Example:
 ```
-uv run https://birkin.github.io/utilities-project/calc_collection_size.py --collection-pid bdr:bwehb8b8
+uv run https://brown-university-library.github.io/bdr-api-tools/calc_collection_size.py --collection-pid bdr:bwehb8b8
+
+Collection: bdr:bwehb8b8
+Title: Brown University Open Data Collection
+Items found: 908
+Items with size counted: 908
+Total bytes: 257151383232
+Human: 239.49 GB
 ```
 
-Tweak page-size if desired (API typically caps at <= 500):
-```
-  uv run ./calc_collection_size.py --collection-pid bdr:bwehb8b8 --rows 500
 
-[Code](https://github.com/birkin/utilities-project/blob/main/random_id_maker.py)
+[Code](https://github.com/Brown-University-Library/bdr-api-tools/blob/main/calc_collection_size.py)
 
 ---
