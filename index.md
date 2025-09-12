@@ -36,7 +36,7 @@ Human: 239.49 GB
 
 ## show_zip_info.py
 
-Fetches BDR item-api data and extracts and summarizes zip file data for item and and any hasParts child-items.
+Fetches BDR item-api data and extracts and summarizes zip file data for item and and any `hasParts` child-items.
 
 Example:
 ```
