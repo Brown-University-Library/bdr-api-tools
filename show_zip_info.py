@@ -6,7 +6,7 @@
 # ///
 
 """
-Fetch BDR item and gather zip file data for item and children.
+Fetches BDR item-api data and gathers zip file data for item and children.
 """
 
 import argparse
@@ -15,6 +15,7 @@ from collections.abc import Callable
 from typing import Any
 
 import httpx
+import functools
 
 BDR_ITEM_API_TEMPLATE = 'https://repository.library.brown.edu/api/items/{pid}/'
 
@@ -104,16 +105,12 @@ def main(argv: list[str] | None = None) -> int:
     }
     transport = httpx.HTTPTransport(retries=2)
     with httpx.Client(headers=headers, transport=transport) as client:
-
-        def _fetcher(pid: str) -> dict[str, Any]:
-            """Fetch helper for child lookups."""
-            return fetch_item_json(client, pid)
-
         # fetch parent
         parent_json = fetch_item_json(client, args.item_pid)
 
         # parse parent + children
-        result = parse_item_zip_info(parent_json, _fetcher)
+        fetcher = functools.partial(fetch_item_json, client)
+        result = parse_item_zip_info(parent_json, fetcher)
 
     # print the final structure as JSON
     try:
