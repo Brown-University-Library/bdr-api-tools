@@ -16,6 +16,7 @@ from typing import Any
 
 import httpx
 import functools
+from datetime import datetime
 
 BDR_ITEM_API_TEMPLATE = 'https://repository.library.brown.edu/api/items/{pid}/'
 
@@ -61,18 +62,24 @@ def parse_item_zip_info(
                 continue
             child_json = fetcher(child_pid)
             child_zip_list = list(child_json.get('zip_filelist_ssim', []) or [])
-            has_parts_info.append(
-                {
-                    'child_pid': child_pid,
-                    'child_zip_info': child_zip_list,
-                }
-            )
+            if child_zip_list:
+                has_parts_info.append(
+                    {
+                        'child_pid': child_pid,
+                        'child_zip_info': child_zip_list,
+                    }
+                )
 
     return {
+        '_meta_': {
+            'timestamp': datetime.now().astimezone().isoformat(),
+            'full_item_api_url': build_item_url(pid),
+            'item_pid': pid,
+        },
         'item_info': {
             'pid': pid,
             'item_zip_info': item_zip_info,
-            'has_parts_info': has_parts_info,
+            'has_parts_zip_info': has_parts_info,
         }
     }
 
