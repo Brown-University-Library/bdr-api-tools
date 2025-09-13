@@ -1,7 +1,8 @@
 # /// script
 # requires-python = "==3.12.*"
 # dependencies = [
-#   "httpx"
+#   "httpx",
+#   "tqdm"
 # ]
 # ///
 
@@ -17,6 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
+from tqdm import tqdm
 
 BASE = 'https://repository.library.brown.edu'
 SEARCH_URL = f'{BASE}/api/search/'
@@ -366,7 +368,7 @@ def main() -> int:
             print(f'No items found for collection {collection_pid}', file=sys.stderr)
 
         appended_count = 0
-        for i, doc in enumerate(docs, start=1):
+        for i, doc in enumerate(tqdm(docs, total=len(docs), desc="Processing items"), start=1):
             pid = doc.get('pid')
             if not isinstance(pid, str):
                 continue
