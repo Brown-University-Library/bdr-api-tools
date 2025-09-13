@@ -368,6 +368,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Collect EXTRACTED_TEXT for a collection.')
     parser.add_argument('--collection-pid', required=True, help='Collection PID like bdr:c9fzffs9')
     parser.add_argument('--output-dir', required=True, help='Directory to write outputs')
+    parser.add_argument(
+        '--test-limit',
+        type=int,
+        default=None,
+        metavar='INTEGER',
+        help='Optional. Stop after this many extracted_texts have been successfully appended (useful for testing).'
+    )
     return parser.parse_args()
 
 
@@ -429,6 +436,12 @@ def main() -> int:
                 appended = process_pid_for_extracted_text(client, pid, combined_txt_path, listing)
                 if appended:
                     appended_count += 1
+                    # If a test limit is provided, stop once we've appended that many texts
+                    if args.test_limit is not None and appended_count >= args.test_limit:
+                        # persist before stopping
+                        update_summary(listing, combined_txt_path, listing_json_path)
+                        save_listing(listing_json_path, listing)
+                        break
             except Exception as exc:
                 # record failure stub so resume can continue later without losing context
                 add_listing_entry(
