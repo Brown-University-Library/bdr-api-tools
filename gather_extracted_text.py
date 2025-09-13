@@ -296,12 +296,14 @@ def add_listing_entry(listing: dict[str, object], *, item_pid: str, primary_titl
     items: list[dict[str, object]] = listing.setdefault('items', [])  # type: ignore[assignment]
     # replace if exists (idempotent)
     idx: int | None = next((i for i, d in enumerate(items) if d.get('item_pid') == item_pid), None)
+    # store human-readable size to align with summary
+    human_size: str | None = humanize.naturalsize(extracted_text_file_size) if isinstance(extracted_text_file_size, int) else None
     entry: dict[str, object] = {
         'item_pid': item_pid,
         'primary_title': primary_title,
         'full_item_api_url': full_item_api_url,
         'full_studio_url': full_studio_url,
-        'extracted_text_file_size': extracted_text_file_size,
+        'extracted_text_file_size': human_size,
     }
     if idx is None:
         items.append(entry)
