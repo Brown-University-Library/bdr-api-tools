@@ -19,8 +19,8 @@ from datetime import datetime
 from pathlib import Path
 
 import httpx
-from tqdm import tqdm
 import humanize
+from tqdm import tqdm
 
 BASE = 'https://repository.library.brown.edu'
 SEARCH_URL = f'{BASE}/api/search/'
@@ -414,7 +414,7 @@ def main() -> int:
             coll_json = fetch_item_json(client, collection_pid)
             coll_name = coll_json.get('name') or ''
             parent_name = ''
-            ancestors = coll_json.get('ancestors')
+            ancestors = coll_json.get('ancestors')  # this is helpful for a collection-title like "Theses & Dissertations"
             if isinstance(ancestors, list) and ancestors:
                 last = ancestors[-1]
                 if isinstance(last, dict):
