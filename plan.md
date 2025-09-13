@@ -66,10 +66,10 @@ Each run directory will contain these files:
 A small, explicit state file that allows a new run to:
 - Confirm collection identity and associated run directory.
 - Know whether the run completed fully.
-- Know how many items were processed/appended so far.
-- Know which PIDs are already finalized.
+- Track high-level counts (processed, appended, no_text, forbidden) and paths.
+- Avoid per-PID arrays to keep the file small for large collections.
 
-Proposed schema (fields may be extended in the future):
+Proposed schema (fields may be extended in the future; no per-PID arrays):
 
 ```json
 {
@@ -82,46 +82,30 @@ Proposed schema (fields may be extended in the future):
   "counts": {
     "total_docs": 1234,
     "processed_count": 278,
-    "appended_count": 251
+    "appended_count": 251,
+    "no_text_count": 25,
+    "forbidden_count": 2
   },
   "paths": {
     "combined_text": "run-20250913T115200-0400-bdr_c9fzffs9/extracted_text_for_collection_pid-bdr_c9fzffs9.txt",
     "listing_json": "run-20250913T115200-0400-bdr_c9fzffs9/listing_for_collection_pid-bdr_c9fzffs9.json"
-  },
-  "processed_pids": [
-    "bdr:abc123", "bdr:def456"  
-  ],
-  "finalized_pids": [
-    "bdr:abc123", "bdr:def456"  
-  ],
-  "appended_pids": [
-    "bdr:abc123"
-  ],
-  "no_text_pids": [
-    "bdr:def456"
-  ],
-  "forbidden_pids": [
-    
-  ],
-  "retryable_error_pids": [
-    
-  ]
+  }
 }
 ```
 
 Notes:
-- "finalized" means: do not attempt again on resume. This includes `appended_pids`, `no_text_pids`, and `forbidden_pids`.
-- `retryable_error_pids` is reserved for future use. Given the primary goal to minimize load, the default behavior will not retry these automatically unless the user opts in.
-- We will keep listing JSON as the canonical record of item-level metadata. The checkpoint is a small helper to drive resume logic and avoid reprocessing.
+- Listing JSON remains the canonical record of per-item metadata (including an optional item-level `status`).
+- The checkpoint intentionally avoids per-PID arrays; it stores only small summary counts and paths.
+- On resume, the script computes the processed set from `listing.items` and skips those PIDs.
 
 
 ## How to Determine What to Skip vs. Retry
 
 - Skip (do not retry):
-  - Any PID already present in `listing.items` (current code’s behavior): we will continue this behavior to minimize load.
-  - Any PID explicitly recorded as `forbidden` in the checkpoint (after enhancing error handling to detect HTTP 403), or when inferring from an older run that recorded a `null`/None size.
-    - User clarification: prior entries with `null` size often reflect `Forbidden`; those do not need to be reprocessed.
-  - Any PID where no `EXTRACTED_TEXT` was found (recorded with `null` size) should be considered final.
+  - Any PID already present in `listing.items` (current code’s behavior): continue this behavior to minimize load.
+  - For items with `extracted_text_file_size: null` in the listing:
+    - If optional `status` is `"forbidden"`, treat as final (do not retry).
+    - Otherwise, default to treating `null` as final to minimize load.
 
 - Retry (optional, opt-in only):
   - PIDs that failed due to transient/network errors (not 403). This requires differentiating errors by status code in the future. By default, to reduce load, we will not retry these automatically across runs; users can add a flag later (e.g., `--retry-errors`) if desired.
@@ -134,22 +118,18 @@ Notes:
 2) Search the `--output-dir/` for prior run directories matching `run-*-{safe_collection_pid}`. Sort by timestamp descending.
 
 3) For the most recent prior run:
-   - If a `checkpoint_for_collection_pid-{safe_collection_pid}.json` exists and `completed: false`, use it as the authoritative state.
-   - Else, if no checkpoint exists but a `listing_for_collection_pid-{safe_collection_pid}.json` exists, infer state by:
-     - `processed_pids = set(item["item_pid"])` for all items in listing
-     - `appended_pids = subset where item["extracted_text_file_size"] is not null`
-     - `no_text_pids = subset where item["extracted_text_file_size"] is null`
-     - Consider all of the above as finalized/do-not-retry
+   - If a `checkpoint_for_collection_pid-{safe_collection_pid}.json` exists and `completed: false`, use it for metadata (counts/paths), but rely on the prior `listing.json` to determine which PIDs are already processed.
+   - Else, if no checkpoint exists but a `listing_for_collection_pid-{safe_collection_pid}.json` exists, use that listing directly to determine processed items.
 
 4) Copy the prior run’s `combined text` and `listing.json` into the new run directory.
    - After copying, immediately update the listing’s `summary.combined_text_path` and `summary.listing_path` to point to the new run directory.
-   - Save a new `checkpoint.json` in the new directory, derived from the inferred or prior checkpoint data, with `run_directory_name` set to the new directory.
+   - Save a new `checkpoint.json` in the new directory with `run_directory_name` set to the new directory and counts derived from the listing.
 
-5) Build the set `processed = processed_pids` (from checkpoint or inferred). When iterating `docs` for the current run, skip any PID in `processed`.
+5) Build the set `processed = { item["item_pid"] for item in listing.items }`. When iterating `docs` for the current run, skip any PID in `processed`.
 
 6) After processing each PID:
    - Append to combined text if applicable, update listing entry, update summary, and write the listing JSON (current behavior).
-   - Update `checkpoint.json` with counts, `processed_pids`, and any status-specific lists, then write it to disk.
+   - Recompute counts (`processed_count`, `appended_count`, `no_text_count`, `forbidden_count`) from the listing and write the minimal `checkpoint.json`.
 
 7) On completion:
    - Mark `completed: true` in `checkpoint.json` and write it.
@@ -159,8 +139,8 @@ Notes:
 
 - Improve error handling in `process_pid_for_extracted_text(...)` to catch 403 specifically when streaming EXTRACTED_TEXT and mark an item as `forbidden`.
 - In the listing entry, continue to store `extracted_text_file_size: null` for forbidden cases (to retain backward compatibility), and optionally add a new field `status: "forbidden"` (non-breaking addition) to distinguish from other `null` cases.
-- In the checkpoint, add the PID to `forbidden_pids` and include it in `finalized_pids`.
-- On resume, do not reattempt forbidden items.
+- In the checkpoint, update summary counts by recomputing from the listing; do not store per-PID arrays.
+- On resume, items marked forbidden in the listing are not reattempted.
 
 
 ## Persistence Frequency
@@ -194,18 +174,20 @@ Notes:
 
 2) Checkpoint helpers:
    - Implement `load_checkpoint(path) -> dict` and `save_checkpoint(path, data) -> None` with strict 3.12 type hints and present-tense docstrings.
-   - Implement `infer_checkpoint_from_listing(listing: dict) -> dict` that populates `processed_pids`, `appended_pids`, `no_text_pids` from listing items.
+   - Implement helpers to compute from the listing:
+     - `processed_set_from_listing(listing: dict) -> set[str]`
+     - `counts_from_listing(listing: dict) -> dict` with `processed_count`, `appended_count`, `no_text_count`, `forbidden_count`.
 
 3) Startup resume logic:
    - In `main()`, after creating the new run directory, look for a prior run to resume.
-   - If found and incomplete, copy its files, build or load checkpoint, and initialize `processed` set accordingly.
+   - If found and incomplete, copy its files, load (or synthesize) a checkpoint, and initialize `processed` by reading the listing.
 
 4) Loop-time persistence:
    - After each PID, call `update_summary(...)`, `save_listing(...)`, and `save_checkpoint(...)`.
    - On `--test-limit` exit path, persist both before `break`.
 
 5) Error differentiation:
-   - In `process_pid_for_extracted_text(...)`, detect HTTP 403 from the streaming call and tag the listing item as `status: "forbidden"` (optional, backward-compatible) and update checkpoint lists accordingly.
+   - In `process_pid_for_extracted_text(...)`, detect HTTP 403 from the streaming call and tag the listing item as `status: "forbidden"` (optional, backward-compatible). Checkpoint counts will reflect this on the next save.
 
 6) Completion:
    - After the loop, mark checkpoint as `completed: true` and save it.
@@ -240,4 +222,4 @@ Notes:
 
 ## Summary
 
-This plan introduces a small `checkpoint.json` per run and a startup routine that discovers the latest incomplete prior run for the same collection, copies its outputs, and resumes work without reprocessing. It distinguishes `Forbidden` as final to reduce load. Persistence occurs after each PID, ensuring safe interruption at any time. All changes align with the existing output structure and project style guidelines.
+This plan introduces a small `checkpoint.json` (summary counts and paths, no per-PID arrays) per run and a startup routine that discovers the latest incomplete prior run for the same collection, copies its outputs, and resumes work without reprocessing. It distinguishes `Forbidden` as final to reduce load. Persistence occurs after each PID, ensuring safe interruption at any time. All changes align with the existing output structure and project style guidelines.
