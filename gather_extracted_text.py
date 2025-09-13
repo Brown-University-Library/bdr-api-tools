@@ -423,16 +423,17 @@ def main() -> int:
     args: argparse.Namespace = parse_args()
 
     collection_pid: str = args.collection_pid.strip()
+    safe_collection_pid: str = collection_pid.replace(":", "_")
     out_dir: Path = Path(args.output_dir).expanduser().resolve()
     ensure_dir(out_dir)
 
     # create a timestamped subdirectory within the output directory for this run
-    ts_dir: Path = out_dir / f'run-{_now_compact_local()}'
+    ts_dir: Path = out_dir / f'run-{_now_compact_local()}-{safe_collection_pid}'
     ensure_dir(ts_dir)
 
     # output files
-    combined_txt_path: Path = ts_dir / f'extracted_text_for_collection_pid-{collection_pid.replace(":", "_")}.txt'
-    listing_json_path: Path = ts_dir / f'listing_for_collection_pid-{collection_pid.replace(":", "_")}.json'
+    combined_txt_path: Path = ts_dir / f'extracted_text_for_collection_pid-{safe_collection_pid}.txt'
+    listing_json_path: Path = ts_dir / f'listing_for_collection_pid-{safe_collection_pid}.json'
 
     listing: dict[str, object] = load_listing(listing_json_path)
 
