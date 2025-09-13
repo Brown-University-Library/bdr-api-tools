@@ -93,14 +93,14 @@ def _retrying_stream_text(client: httpx.Client, url: str, *, max_tries: int = 4,
     raise last_exc
 
 
-def search_collection_pids(client: httpx.Client, collection_pid: str) -> list[dict]:
+def search_collection_pids(client: httpx.Client, collection_pid: str) -> list[dict[str, object]]:
     """
     Uses search-api to list items in a collection, returning docs with pid & primary_title.
     Minimizes calls by paging via rows/start.
     """
     rows = 500
     start = 0
-    docs: list[dict] = []
+    docs: list[dict[str, object]] = []
     # Filter by collection membership; request just needed fields
     fq = f'rel_is_member_of_collection_ssim:"{collection_pid}"'
     fl = 'pid,primary_title'
@@ -120,7 +120,7 @@ def search_collection_pids(client: httpx.Client, collection_pid: str) -> list[di
     return docs
 
 
-def fetch_item_json(client: httpx.Client, pid: str) -> dict:
+def fetch_item_json(client: httpx.Client, pid: str) -> dict[str, object]:
     """
     Fetches item-api json for a pid.
     """
@@ -130,7 +130,7 @@ def fetch_item_json(client: httpx.Client, pid: str) -> dict:
     return resp.json()
 
 
-def _extract_child_pids(item_json: dict) -> list[str]:
+def _extract_child_pids(item_json: dict[str, object]) -> list[str]:
     """
     Extracts child pids from relations.hasPart, supporting list[str] or list[dict].
     """
@@ -147,7 +147,7 @@ def _extract_child_pids(item_json: dict) -> list[str]:
     return child_pids
 
 
-def _find_extracted_text_link_and_size(item_json: dict, pid: str) -> tuple[str, int | None] | None:
+def _find_extracted_text_link_and_size(item_json: dict[str, object], pid: str) -> tuple[str, int | None] | None:
     """
     Locates EXTRACTED_TEXT download URL and size if available.
     Checks links.content_datastreams, then links.datastreams, then datastreams size + constructs URL.
@@ -177,7 +177,7 @@ def _find_extracted_text_link_and_size(item_json: dict, pid: str) -> tuple[str, 
     return None
 
 
-def _extract_size_from_datastreams(item_json: dict) -> int | None:
+def _extract_size_from_datastreams(item_json: dict[str, object]) -> int | None:
     """
     Extracts EXTRACTED_TEXT size from datastreams block if present.
     """
@@ -199,7 +199,7 @@ def ensure_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
 
-def load_listing(path: Path) -> dict:
+def load_listing(path: Path) -> dict[str, object]:
     """
     Loads listing json if present; otherwise returns initial structure.
     """
@@ -223,7 +223,7 @@ def load_listing(path: Path) -> dict:
     }
 
 
-def save_listing(path: Path, listing: dict) -> None:
+def save_listing(path: Path, listing: dict[str, object]) -> None:
     """
     Saves listing as pretty JSON.
     """
@@ -243,7 +243,7 @@ def append_text(out_txt_path: Path, pid: str, text: str) -> None:
         fh.write('\n')
 
 
-def already_processed(listing: dict) -> set[str]:
+def already_processed(listing: dict[str, object]) -> set[str]:
     """
     Returns set of PIDs already in listing items.
     """
@@ -255,7 +255,7 @@ def already_processed(listing: dict) -> set[str]:
     return done
 
 
-def add_listing_entry(listing: dict, *, item_pid: str, primary_title: str, full_item_api_url: str, full_studio_url: str, extracted_text_file_size: int | None) -> None:
+def add_listing_entry(listing: dict[str, object], *, item_pid: str, primary_title: str, full_item_api_url: str, full_studio_url: str, extracted_text_file_size: int | None) -> None:
     """
     Adds or replaces a listing entry for an item_pid.
     """
@@ -283,7 +283,7 @@ def _parent_dir_and_name(p: Path) -> str:
     return f"{p.parent.name}/{p.name}"
 
 
-def update_summary(listing: dict, combined_path: Path, listing_path: Path) -> None:
+def update_summary(listing: dict[str, object], combined_path: Path, listing_path: Path) -> None:
     """
     Updates summary block based on current items and combined text size.
     """
@@ -298,7 +298,7 @@ def update_summary(listing: dict, combined_path: Path, listing_path: Path) -> No
     listing['summary']['listing_path'] = _parent_dir_and_name(listing_path)
 
 
-def process_pid_for_extracted_text(client: httpx.Client, pid: str, out_txt_path: Path, listing: dict) -> bool:
+def process_pid_for_extracted_text(client: httpx.Client, pid: str, out_txt_path: Path, listing: dict[str, object]) -> bool:
     """
     Processes a pid:
     - fetches item json
