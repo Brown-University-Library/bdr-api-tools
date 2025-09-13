@@ -392,24 +392,18 @@ def find_latest_prior_run_dir(out_dir: Path, safe_collection_pid: str) -> Path |
         return None
     # sort descending by directory name (timestamp prefix ensures correct order locally)
     candidates.sort(key=lambda p: p.name, reverse=True)
-    for cand in candidates:
-        ck: Path = cand / f'checkpoint_for_collection_pid-{safe_collection_pid}.json'
-        listing_p: Path = cand / f'listing_for_collection_pid-{safe_collection_pid}.json'
-        if ck.exists():
-            try:
-                with ck.open('r', encoding='utf-8') as fh:
-                    data: dict[str, object] = json.load(fh)
-                # Only resume from a run whose checkpoint explicitly indicates incomplete
-                if not bool(data.get('completed', False)) and listing_p.exists():
-                    return cand
-                # If checkpoint says completed, skip this candidate (do not fall back to listing)
-                continue
-            except Exception:
-                # Malformed checkpoint: allow fallback to listing heuristic
-                pass
-        # Only use listing heuristic when no checkpoint file exists for the candidate
-        if not ck.exists() and listing_p.exists():
-            return cand
+    latest: Path = candidates[0]
+    ck: Path = latest / f'checkpoint_for_collection_pid-{safe_collection_pid}.json'
+    listing_p: Path = latest / f'listing_for_collection_pid-{safe_collection_pid}.json'
+    if not ck.exists():
+        return None
+    try:
+        with ck.open('r', encoding='utf-8') as fh:
+            data: dict[str, object] = json.load(fh)
+        if not bool(data.get('completed', False)) and listing_p.exists():
+            return latest
+    except Exception:
+        return None
     return None
 
 
@@ -577,8 +571,14 @@ def main() -> int:
     out_dir: Path = Path(args.output_dir).expanduser().resolve()
     ensure_dir(out_dir)
 
+    # Determine whether to resume from a prior run BEFORE creating the new run directory
+    prior_dir: Path | None = None
+    if args.test_limit is None:
+        prior_dir = find_latest_prior_run_dir(out_dir, safe_collection_pid)
+
     # create a timestamped subdirectory within the output directory for this run
-    ts_dir: Path = out_dir / _run_dir_name_for(safe_collection_pid)
+    ts_dir_name: str = _run_dir_name_for(safe_collection_pid)
+    ts_dir: Path = out_dir / ts_dir_name
     ensure_dir(ts_dir)
 
     # output files
@@ -586,8 +586,7 @@ def main() -> int:
     listing_json_path: Path = ts_dir / f'listing_for_collection_pid-{safe_collection_pid}.json'
     checkpoint_json_path: Path = ts_dir / f'checkpoint_for_collection_pid-{safe_collection_pid}.json'
 
-    # attempt resume from latest prior run
-    prior_dir: Path | None = find_latest_prior_run_dir(out_dir, safe_collection_pid)
+    # attempt resume from latest prior run (skipped if --test-limit provided)
     if prior_dir is not None:
         copy_prior_outputs(prior_dir, ts_dir, safe_collection_pid)
     # load listing (copied or new)
