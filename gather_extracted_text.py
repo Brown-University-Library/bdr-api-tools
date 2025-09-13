@@ -541,6 +541,16 @@ def process_pid_for_extracted_text(client: httpx.Client, pid: str, out_txt_path:
                         extracted_text_file_size=None,
                     )
                     listing['items'][-1]['status'] = 'forbidden'  # type: ignore[index]
+                    # also mark parent as handled via child (forbidden)
+                    add_listing_entry(
+                        listing,
+                        item_pid=pid,
+                        primary_title=primary_title,
+                        full_item_api_url=item_api_url,
+                        full_studio_url=studio_url,
+                        extracted_text_file_size=None,
+                    )
+                    listing['items'][-1]['status'] = 'forbidden_via_child'  # type: ignore[index]
                     return False
                 raise
             append_text(out_txt_path, child_pid, text)
@@ -552,6 +562,16 @@ def process_pid_for_extracted_text(client: httpx.Client, pid: str, out_txt_path:
                 full_studio_url=child_studio_url,
                 extracted_text_file_size=size,
             )
+            # also add an entry for the parent to indicate it was handled via child
+            add_listing_entry(
+                listing,
+                item_pid=pid,
+                primary_title=primary_title,
+                full_item_api_url=item_api_url,
+                full_studio_url=studio_url,
+                extracted_text_file_size=None,
+            )
+            listing['items'][-1]['status'] = 'handled_via_child'  # type: ignore[index]
             return True
 
     # no extracted text found
@@ -595,9 +615,7 @@ def main() -> int:
     ensure_dir(out_dir)
 
     # Determine whether to resume from a prior run BEFORE creating the new run directory
-    prior_dir: Path | None = None
-    if args.test_limit is None:
-        prior_dir = find_latest_prior_run_dir(out_dir, safe_collection_pid)
+    prior_dir: Path | None = find_latest_prior_run_dir(out_dir, safe_collection_pid)
 
     # create a timestamped subdirectory within the output directory for this run
     ts_dir_name: str = _run_dir_name_for(safe_collection_pid)
