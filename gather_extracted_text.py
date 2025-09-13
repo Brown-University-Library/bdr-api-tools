@@ -412,7 +412,19 @@ def main() -> int:
         # record collection metadata in summary
         try:
             coll_json = fetch_item_json(client, collection_pid)
-            coll_title = coll_json.get('primary_title') or coll_json.get('mods_title_full_primary_tsi') or ''
+            coll_name = coll_json.get('name') or ''
+            parent_name = ''
+            ancestors = coll_json.get('ancestors')
+            if isinstance(ancestors, list) and ancestors:
+                last = ancestors[-1]
+                if isinstance(last, dict):
+                    parent_name = last.get('name') or last.get('title') or ''
+                elif isinstance(last, str):
+                    parent_name = last
+            if coll_name and parent_name:
+                coll_title = f"{coll_name} -- (from {parent_name})"
+            else:
+                coll_title = coll_name or ''
         except Exception:
             coll_title = ''
         listing['summary']['collection_pid'] = collection_pid
