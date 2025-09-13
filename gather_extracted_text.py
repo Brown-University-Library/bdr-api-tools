@@ -361,14 +361,21 @@ def process_pid_for_extracted_text(client: httpx.Client, pid: str, out_txt_path:
     return False
 
 
-def main() -> int:
+def parse_args() -> argparse.Namespace:
     """
-    Parses args, fetches collection members, finds EXTRACTED_TEXT, writes combined text and JSON listing with resume support.
+    Parses and returns command-line arguments for this script.
     """
     parser = argparse.ArgumentParser(description='Collect EXTRACTED_TEXT for a collection.')
     parser.add_argument('--collection-pid', required=True, help='Collection PID like bdr:c9fzffs9')
     parser.add_argument('--output-dir', required=True, help='Directory to write outputs')
-    args = parser.parse_args()
+    return parser.parse_args()
+
+
+def main() -> int:
+    """
+    Fetches collection members, finds EXTRACTED_TEXT, writes combined text and JSON listing with resume support.
+    """
+    args = parse_args()
 
     collection_pid = args.collection_pid.strip()
     out_dir = Path(args.output_dir).expanduser().resolve()
