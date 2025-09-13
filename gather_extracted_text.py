@@ -13,6 +13,9 @@ Collects extracted_text for a collection.
 
 import argparse
 import json
+import logging
+import os
+import shutil
 import sys
 import time
 from datetime import datetime
@@ -21,6 +24,25 @@ from pathlib import Path
 import httpx
 import humanize
 from tqdm import tqdm
+
+## setup logging
+log_level_name: str = os.getenv('LOG_LEVEL', 'INFO').upper()
+log_level = getattr(
+    logging, log_level_name, logging.INFO
+)  # maps the string name to the corresponding logging level constant; defaults to INFO
+logging.basicConfig(
+    level=log_level,
+    format='[%(asctime)s] %(levelname)s [%(module)s-%(funcName)s()::%(lineno)d] %(message)s',
+    datefmt='%d/%b/%Y %H:%M:%S',
+)
+log = logging.getLogger(__name__)
+## prevent httpx from logging
+if log_level <= logging.INFO:
+    for noisy in ('httpx', 'httpcore'):
+        lg = logging.getLogger(noisy)
+        lg.setLevel(logging.WARNING)  # or logging.ERROR if you prefer only errors
+        lg.propagate = False  # don't bubble up to root
+
 
 BASE = 'https://repository.library.brown.edu'
 SEARCH_URL = f'{BASE}/api/search/'
@@ -107,6 +129,7 @@ def search_collection_pids(client: httpx.Client, collection_pid: str) -> list[di
     fl: str = 'pid,primary_title'
     while True:
         url: str = f'{SEARCH_URL}?q=*:*&fq={httpx.QueryParams({"fq": fq})["fq"]}&fl={fl}&rows={rows}&start={start}'
+        log.debug( f' trying search url, ``{url}``')
         resp: httpx.Response = _retrying_get(client, url)
         data: dict[str, object] = resp.json()
         response: dict[str, object] = data.get('response', {})  # type: ignore[assignment]
@@ -126,6 +149,7 @@ def fetch_item_json(client: httpx.Client, pid: str) -> dict[str, object]:
     Fetches item-api json for a pid.
     """
     url: str = ITEM_URL_TPL.format(pid=pid)
+    log.debug( f'trying item url, ``{url}``')
     resp: httpx.Response = _retrying_get(client, url)
     resp.raise_for_status()
     return resp.json()
@@ -336,6 +360,120 @@ def update_summary(listing: dict[str, object], combined_path: Path, listing_path
     listing['summary']['listing_path'] = _parent_dir_and_name(listing_path)
 
 
+def processed_set_from_listing(listing: dict[str, object]) -> set[str]:
+    """
+    Computes set of item_pids present in listing items.
+    """
+    pids: set[str] = set()
+    for d in listing.get('items', []):
+        pid: object = d.get('item_pid')  # type: ignore[index]
+        if isinstance(pid, str):
+            pids.add(pid)
+    return pids
+
+
+def counts_from_listing(listing: dict[str, object], *, total_docs: int = 0) -> dict[str, int]:
+    """
+    Computes summary counts from listing items.
+    """
+    items: list[dict[str, object]] = listing.get('items', [])  # type: ignore[assignment]
+    processed_count: int = len({d.get('item_pid') for d in items if isinstance(d.get('item_pid'), str)})
+    appended_count: int = sum(1 for d in items if d.get('extracted_text_file_size'))
+    no_text_count: int = sum(1 for d in items if d.get('extracted_text_file_size') in (None, ''))
+    forbidden_count: int = sum(1 for d in items if d.get('status') == 'forbidden')
+    return {
+        'total_docs': total_docs,
+        'processed_count': processed_count,
+        'appended_count': appended_count,
+        'no_text_count': no_text_count,
+        'forbidden_count': forbidden_count,
+    }
+
+
+def _run_dir_name_for(safe_collection_pid: str) -> str:
+    """
+    Returns a timestamped run directory name for a safe collection pid.
+    """
+    return f'run-{_now_compact_local()}-{safe_collection_pid}'
+
+
+def _is_run_dir_for(path: Path, safe_collection_pid: str) -> bool:
+    """
+    Checks whether a path appears to be a run directory for the safe collection pid.
+    """
+    name: str = path.name
+    return name.startswith('run-') and name.endswith(f'-{safe_collection_pid}') and path.is_dir()
+
+
+def find_latest_prior_run_dir(out_dir: Path, safe_collection_pid: str) -> Path | None:
+    """
+    Finds the latest prior run directory for this collection pid that appears usable.
+    Prefers an incomplete checkpoint when available; otherwise uses presence of a listing file.
+    """
+    candidates: list[Path] = [p for p in out_dir.iterdir() if _is_run_dir_for(p, safe_collection_pid)]
+    if not candidates:
+        return None
+    # sort descending by directory name (timestamp prefix ensures correct order locally)
+    candidates.sort(key=lambda p: p.name, reverse=True)
+    latest: Path = candidates[0]
+    ck: Path = latest / f'checkpoint_for_collection_pid-{safe_collection_pid}.json'
+    listing_p: Path = latest / f'listing_for_collection_pid-{safe_collection_pid}.json'
+    if not ck.exists():
+        return None
+    try:
+        with ck.open('r', encoding='utf-8') as fh:
+            data: dict[str, object] = json.load(fh)
+        if not bool(data.get('completed', False)) and listing_p.exists():
+            return latest
+    except Exception:
+        return None
+    return None
+
+
+def copy_prior_outputs(prior_dir: Path, new_dir: Path, safe_collection_pid: str) -> None:
+    """
+    Copies combined text and listing JSON from a prior run into the new run directory.
+    """
+    prior_combined: Path = prior_dir / f'extracted_text_for_collection_pid-{safe_collection_pid}.txt'
+    prior_listing: Path = prior_dir / f'listing_for_collection_pid-{safe_collection_pid}.json'
+    new_combined: Path = new_dir / prior_combined.name
+    new_listing: Path = new_dir / prior_listing.name
+    if prior_combined.exists():
+        shutil.copy2(prior_combined, new_combined)
+    if prior_listing.exists():
+        shutil.copy2(prior_listing, new_listing)
+
+
+def save_checkpoint(checkpoint_path: Path, *, collection_pid: str, safe_collection_pid: str, run_directory_name: str, listing: dict[str, object], combined_path: Path, listing_path: Path, total_docs: int, completed: bool) -> None:
+    """
+    Saves minimal checkpoint JSON with counts and paths.
+    """
+    existing: dict[str, object] | None = None
+    if checkpoint_path.exists():
+        try:
+            with checkpoint_path.open('r', encoding='utf-8') as fh:
+                existing = json.load(fh)
+        except Exception:
+            existing = None
+    created_at: str = existing.get('created_at') if isinstance(existing, dict) and isinstance(existing.get('created_at'), str) else _now_iso()
+    counts: dict[str, int] = counts_from_listing(listing, total_docs=total_docs)
+    data: dict[str, object] = {
+        'collection_pid': collection_pid,
+        'safe_collection_pid': safe_collection_pid,
+        'created_at': created_at,
+        'updated_at': _now_iso(),
+        'run_directory_name': run_directory_name,
+        'completed': completed,
+        'counts': counts,
+        'paths': {
+            'combined_text': _parent_dir_and_name(combined_path),
+            'listing_json': _parent_dir_and_name(listing_path),
+        },
+    }
+    with checkpoint_path.open('w', encoding='utf-8') as fh:
+        json.dump(data, fh, ensure_ascii=False, indent=2)
+
+
 def process_pid_for_extracted_text(client: httpx.Client, pid: str, out_txt_path: Path, listing: dict[str, object]) -> bool:
     """
     Processes a pid:
@@ -353,7 +491,22 @@ def process_pid_for_extracted_text(client: httpx.Client, pid: str, out_txt_path:
     found: tuple[str, int | None] | None = _find_extracted_text_link_and_size(item_json, pid)
     if found:
         url, size = found
-        text: str = _retrying_stream_text(client, url)
+        try:
+            text: str = _retrying_stream_text(client, url)
+        except httpx.HTTPStatusError as exc:
+            if exc.response is not None and exc.response.status_code == 403:
+                add_listing_entry(
+                    listing,
+                    item_pid=pid,
+                    primary_title=primary_title,
+                    full_item_api_url=item_api_url,
+                    full_studio_url=studio_url,
+                    extracted_text_file_size=None,
+                )
+                # mark forbidden for counts via optional status
+                listing['items'][-1]['status'] = 'forbidden'  # type: ignore[index]
+                return False
+            raise
         append_text(out_txt_path, pid, text)
         add_listing_entry(
             listing,
@@ -375,7 +528,31 @@ def process_pid_for_extracted_text(client: httpx.Client, pid: str, out_txt_path:
         child_found: tuple[str, int | None] | None = _find_extracted_text_link_and_size(child_json, child_pid)
         if child_found:
             url, size = child_found
-            text = _retrying_stream_text(client, url)
+            try:
+                text = _retrying_stream_text(client, url)
+            except httpx.HTTPStatusError as exc:
+                if exc.response is not None and exc.response.status_code == 403:
+                    add_listing_entry(
+                        listing,
+                        item_pid=child_pid,
+                        primary_title=child_title,
+                        full_item_api_url=child_api_url,
+                        full_studio_url=child_studio_url,
+                        extracted_text_file_size=None,
+                    )
+                    listing['items'][-1]['status'] = 'forbidden'  # type: ignore[index]
+                    # also mark parent as handled via child (forbidden)
+                    add_listing_entry(
+                        listing,
+                        item_pid=pid,
+                        primary_title=primary_title,
+                        full_item_api_url=item_api_url,
+                        full_studio_url=studio_url,
+                        extracted_text_file_size=None,
+                    )
+                    listing['items'][-1]['status'] = 'forbidden_via_child'  # type: ignore[index]
+                    return False
+                raise
             append_text(out_txt_path, child_pid, text)
             add_listing_entry(
                 listing,
@@ -385,6 +562,16 @@ def process_pid_for_extracted_text(client: httpx.Client, pid: str, out_txt_path:
                 full_studio_url=child_studio_url,
                 extracted_text_file_size=size,
             )
+            # also add an entry for the parent to indicate it was handled via child
+            add_listing_entry(
+                listing,
+                item_pid=pid,
+                primary_title=primary_title,
+                full_item_api_url=item_api_url,
+                full_studio_url=studio_url,
+                extracted_text_file_size=None,
+            )
+            listing['items'][-1]['status'] = 'handled_via_child'  # type: ignore[index]
             return True
 
     # no extracted text found
@@ -423,22 +610,47 @@ def main() -> int:
     args: argparse.Namespace = parse_args()
 
     collection_pid: str = args.collection_pid.strip()
+    safe_collection_pid: str = collection_pid.replace(":", "_")
     out_dir: Path = Path(args.output_dir).expanduser().resolve()
     ensure_dir(out_dir)
 
+    # Determine whether to resume from a prior run BEFORE creating the new run directory
+    prior_dir: Path | None = find_latest_prior_run_dir(out_dir, safe_collection_pid)
+
     # create a timestamped subdirectory within the output directory for this run
-    ts_dir: Path = out_dir / f'run-{_now_compact_local()}'
+    ts_dir_name: str = _run_dir_name_for(safe_collection_pid)
+    ts_dir: Path = out_dir / ts_dir_name
     ensure_dir(ts_dir)
 
     # output files
-    combined_txt_path: Path = ts_dir / f'extracted_text_for_collection_pid-{collection_pid.replace(":", "_")}.txt'
-    listing_json_path: Path = ts_dir / f'listing_for_collection_pid-{collection_pid.replace(":", "_")}.json'
+    combined_txt_path: Path = ts_dir / f'extracted_text_for_collection_pid-{safe_collection_pid}.txt'
+    listing_json_path: Path = ts_dir / f'listing_for_collection_pid-{safe_collection_pid}.json'
+    checkpoint_json_path: Path = ts_dir / f'checkpoint_for_collection_pid-{safe_collection_pid}.json'
 
+    # attempt resume from latest prior run (skipped if --test-limit provided)
+    if prior_dir is not None:
+        copy_prior_outputs(prior_dir, ts_dir, safe_collection_pid)
+    # load listing (copied or new)
     listing: dict[str, object] = load_listing(listing_json_path)
-
-    processed: set[str] = already_processed(listing)
-    # ensure combined exists if resuming
+    # ensure combined exists if resuming or fresh
     combined_txt_path.touch(exist_ok=True)
+    # compute effective remaining limit if a test limit is provided, accounting for prior appended items
+    effective_limit: int | None = None
+    if args.test_limit is not None:
+        prior_appended_count: int = sum(1 for d in listing.get('items', []) if d.get('extracted_text_file_size'))
+        effective_limit = max(0, args.test_limit - prior_appended_count)
+    # initialize a minimal checkpoint with zero counts; will be updated after docs fetch
+    save_checkpoint(
+        checkpoint_json_path,
+        collection_pid=collection_pid,
+        safe_collection_pid=safe_collection_pid,
+        run_directory_name=ts_dir.name,
+        listing=listing,
+        combined_path=combined_txt_path,
+        listing_path=listing_json_path,
+        total_docs=0,
+        completed=False,
+    )
 
     # http client
     headers: dict[str, str] = {
@@ -458,10 +670,43 @@ def main() -> int:
 
         # enumerate collection via search-api
         docs: list[dict[str, object]] = search_collection_pids(client, collection_pid)
+        # update checkpoint with total_docs
+        save_checkpoint(
+            checkpoint_json_path,
+            collection_pid=collection_pid,
+            safe_collection_pid=safe_collection_pid,
+            run_directory_name=ts_dir.name,
+            listing=listing,
+            combined_path=combined_txt_path,
+            listing_path=listing_json_path,
+            total_docs=len(docs),
+            completed=False,
+        )
         if not docs:
             print(f'No items found for collection {collection_pid}', file=sys.stderr)
 
+        # If we've already satisfied the limit in a prior run, persist and exit early
+        if effective_limit == 0:
+            update_summary(listing, combined_txt_path, listing_json_path)
+            save_listing(listing_json_path, listing)
+            save_checkpoint(
+                checkpoint_json_path,
+                collection_pid=collection_pid,
+                safe_collection_pid=safe_collection_pid,
+                run_directory_name=ts_dir.name,
+                listing=listing,
+                combined_path=combined_txt_path,
+                listing_path=listing_json_path,
+                total_docs=len(docs),
+                completed=False,
+            )
+            print('Done. Appended text for 0 item(s). (Effective limit reached from prior run.)')
+            print(f'Combined text: {combined_txt_path}')
+            print(f'Listing JSON:  {listing_json_path}')
+            return 0
+
         appended_count: int = 0
+        processed: set[str] = already_processed(listing)
         for i, doc in enumerate(tqdm(docs, total=len(docs), desc="Processing items"), start=1):
             pid: object = doc.get('pid')
             if not isinstance(pid, str):
@@ -474,11 +719,22 @@ def main() -> int:
                 appended: bool = process_pid_for_extracted_text(client, pid, combined_txt_path, listing)
                 if appended:
                     appended_count += 1
-                    # If a test limit is provided, stop once we've appended that many texts
-                    if args.test_limit is not None and appended_count >= args.test_limit:
+                    # If an effective limit is provided, stop once we've appended that many texts in THIS run
+                    if effective_limit is not None and appended_count >= effective_limit:
                         # persist before stopping
                         update_summary(listing, combined_txt_path, listing_json_path)
                         save_listing(listing_json_path, listing)
+                        save_checkpoint(
+                            checkpoint_json_path,
+                            collection_pid=collection_pid,
+                            safe_collection_pid=safe_collection_pid,
+                            run_directory_name=ts_dir.name,
+                            listing=listing,
+                            combined_path=combined_txt_path,
+                            listing_path=listing_json_path,
+                            total_docs=len(docs),
+                            completed=False,
+                        )
                         break
             except Exception as exc:
                 # record failure stub so resume can continue later without losing context
@@ -495,10 +751,32 @@ def main() -> int:
             # persist after each pid for robust resume
             update_summary(listing, combined_txt_path, listing_json_path)
             save_listing(listing_json_path, listing)
+            save_checkpoint(
+                checkpoint_json_path,
+                collection_pid=collection_pid,
+                safe_collection_pid=safe_collection_pid,
+                run_directory_name=ts_dir.name,
+                listing=listing,
+                combined_path=combined_txt_path,
+                listing_path=listing_json_path,
+                total_docs=len(docs),
+                completed=False,
+            )
 
         # final summary update
         update_summary(listing, combined_txt_path, listing_json_path)
         save_listing(listing_json_path, listing)
+        save_checkpoint(
+            checkpoint_json_path,
+            collection_pid=collection_pid,
+            safe_collection_pid=safe_collection_pid,
+            run_directory_name=ts_dir.name,
+            listing=listing,
+            combined_path=combined_txt_path,
+            listing_path=listing_json_path,
+            total_docs=len(docs),
+            completed=True,
+        )
 
     print(f'Done. Appended text for {appended_count} item(s).')
     print(f'Combined text: {combined_txt_path}')
