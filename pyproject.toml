@@ -13,7 +13,7 @@ prod = []
 
 [tool.birkin_project_guidelines]
 llm_code_directives = [
-  "use python-3.12 type-hints everywhere; avoid unnecessary `typing` imports",
+  "use python-3.12 type-hints everywhere for functions and variables; avoid unnecessary `typing` imports via using generics",
   "structure scripts with `if __name__ == '__main__': main()`",
   "keep main() as simple as possible; delegate to subroutines",
   "use httpx for all HTTP calls",
