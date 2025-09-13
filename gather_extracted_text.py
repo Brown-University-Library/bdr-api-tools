@@ -13,15 +13,36 @@ Collects extracted_text for a collection.
 
 import argparse
 import json
+import logging
+import os
+import shutil
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
-import shutil
 
 import httpx
 import humanize
 from tqdm import tqdm
+
+## setup logging
+log_level_name: str = os.getenv('LOG_LEVEL', 'INFO').upper()
+log_level = getattr(
+    logging, log_level_name, logging.INFO
+)  # maps the string name to the corresponding logging level constant; defaults to INFO
+logging.basicConfig(
+    level=log_level,
+    format='[%(asctime)s] %(levelname)s [%(module)s-%(funcName)s()::%(lineno)d] %(message)s',
+    datefmt='%d/%b/%Y %H:%M:%S',
+)
+log = logging.getLogger(__name__)
+## prevent httpx from logging
+if log_level <= logging.INFO:
+    for noisy in ('httpx', 'httpcore'):
+        lg = logging.getLogger(noisy)
+        lg.setLevel(logging.WARNING)  # or logging.ERROR if you prefer only errors
+        lg.propagate = False  # don't bubble up to root
+
 
 BASE = 'https://repository.library.brown.edu'
 SEARCH_URL = f'{BASE}/api/search/'
@@ -108,6 +129,7 @@ def search_collection_pids(client: httpx.Client, collection_pid: str) -> list[di
     fl: str = 'pid,primary_title'
     while True:
         url: str = f'{SEARCH_URL}?q=*:*&fq={httpx.QueryParams({"fq": fq})["fq"]}&fl={fl}&rows={rows}&start={start}'
+        log.debug( f' trying search url, ``{url}``')
         resp: httpx.Response = _retrying_get(client, url)
         data: dict[str, object] = resp.json()
         response: dict[str, object] = data.get('response', {})  # type: ignore[assignment]
@@ -127,6 +149,7 @@ def fetch_item_json(client: httpx.Client, pid: str) -> dict[str, object]:
     Fetches item-api json for a pid.
     """
     url: str = ITEM_URL_TPL.format(pid=pid)
+    log.debug( f'trying item url, ``{url}``')
     resp: httpx.Response = _retrying_get(client, url)
     resp.raise_for_status()
     return resp.json()
