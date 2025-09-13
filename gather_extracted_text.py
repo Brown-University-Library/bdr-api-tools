@@ -2,7 +2,8 @@
 # requires-python = "==3.12.*"
 # dependencies = [
 #   "httpx",
-#   "tqdm"
+#   "tqdm",
+#   "humanize"
 # ]
 # ///
 
@@ -19,6 +20,7 @@ from pathlib import Path
 
 import httpx
 from tqdm import tqdm
+import humanize
 
 BASE = 'https://repository.library.brown.edu'
 SEARCH_URL = f'{BASE}/api/search/'
@@ -207,7 +209,8 @@ def load_listing(path: Path) -> dict:
     return {
         'summary': {
             'timestamp': _now_iso(),
-            'all_extracted_text_file_size': 0,
+            'all_extracted_text_file_size_bytes': 0,
+            'all_extracted_text_file_size_human': '0 Bytes',
             'count_of_all_extracted_text_files': 0,
         },
         'items': []
@@ -273,7 +276,8 @@ def update_summary(listing: dict, combined_path: Path) -> None:
     count = sum(1 for d in listing.get('items', []) if d.get('extracted_text_file_size'))
     size = combined_path.stat().st_size if combined_path.exists() else 0
     listing['summary']['count_of_all_extracted_text_files'] = count
-    listing['summary']['all_extracted_text_file_size'] = size
+    listing['summary']['all_extracted_text_file_size_bytes'] = size
+    listing['summary']['all_extracted_text_file_size_human'] = humanize.naturalsize(size)
     listing['summary']['timestamp'] = _now_iso()
 
 
