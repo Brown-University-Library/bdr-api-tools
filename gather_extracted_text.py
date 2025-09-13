@@ -212,6 +212,9 @@ def load_listing(path: Path) -> dict:
             'all_extracted_text_file_size_bytes': 0,
             'all_extracted_text_file_size_human': '0 Bytes',
             'count_of_all_extracted_text_files': 0,
+            # paths recorded as "parent-dir/filename" (no full absolute path)
+            'combined_text_path': '',
+            'listing_path': '',
         },
         'items': []
     }
@@ -269,7 +272,15 @@ def add_listing_entry(listing: dict, *, item_pid: str, primary_title: str, full_
         items[idx] = entry
 
 
-def update_summary(listing: dict, combined_path: Path) -> None:
+def _parent_dir_and_name(p: Path) -> str:
+    """
+    Returns a string formatted as "parent-dir/filename" for the given Path.
+    The parent is just the immediate directory name, not the full path.
+    """
+    return f"{p.parent.name}/{p.name}"
+
+
+def update_summary(listing: dict, combined_path: Path, listing_path: Path) -> None:
     """
     Updates summary block based on current items and combined text size.
     """
@@ -279,6 +290,9 @@ def update_summary(listing: dict, combined_path: Path) -> None:
     listing['summary']['all_extracted_text_file_size_bytes'] = size
     listing['summary']['all_extracted_text_file_size_human'] = humanize.naturalsize(size)
     listing['summary']['timestamp'] = _now_iso()
+    # store paths in parent-dir/filename form (no full absolute path)
+    listing['summary']['combined_text_path'] = _parent_dir_and_name(combined_path)
+    listing['summary']['listing_path'] = _parent_dir_and_name(listing_path)
 
 
 def process_pid_for_extracted_text(client: httpx.Client, pid: str, out_txt_path: Path, listing: dict) -> bool:
@@ -409,11 +423,11 @@ def main() -> int:
                 print(f'Error processing {pid}: {exc}', file=sys.stderr)
 
             # persist after each pid for robust resume
-            update_summary(listing, combined_txt_path)
+            update_summary(listing, combined_txt_path, listing_json_path)
             save_listing(listing_json_path, listing)
 
         # final summary update
-        update_summary(listing, combined_txt_path)
+        update_summary(listing, combined_txt_path, listing_json_path)
         save_listing(listing_json_path, listing)
 
     print(f'Done. Appended text for {appended_count} item(s).')
