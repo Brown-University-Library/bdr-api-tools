@@ -634,6 +634,11 @@ def main() -> int:
     listing: dict[str, object] = load_listing(listing_json_path)
     # ensure combined exists if resuming or fresh
     combined_txt_path.touch(exist_ok=True)
+    # compute effective remaining limit if a test limit is provided, accounting for prior appended items
+    effective_limit: int | None = None
+    if args.test_limit is not None:
+        prior_appended_count: int = sum(1 for d in listing.get('items', []) if d.get('extracted_text_file_size'))
+        effective_limit = max(0, args.test_limit - prior_appended_count)
     # initialize a minimal checkpoint with zero counts; will be updated after docs fetch
     save_checkpoint(
         checkpoint_json_path,
@@ -680,6 +685,26 @@ def main() -> int:
         if not docs:
             print(f'No items found for collection {collection_pid}', file=sys.stderr)
 
+        # If we've already satisfied the limit in a prior run, persist and exit early
+        if effective_limit == 0:
+            update_summary(listing, combined_txt_path, listing_json_path)
+            save_listing(listing_json_path, listing)
+            save_checkpoint(
+                checkpoint_json_path,
+                collection_pid=collection_pid,
+                safe_collection_pid=safe_collection_pid,
+                run_directory_name=ts_dir.name,
+                listing=listing,
+                combined_path=combined_txt_path,
+                listing_path=listing_json_path,
+                total_docs=len(docs),
+                completed=False,
+            )
+            print('Done. Appended text for 0 item(s). (Effective limit reached from prior run.)')
+            print(f'Combined text: {combined_txt_path}')
+            print(f'Listing JSON:  {listing_json_path}')
+            return 0
+
         appended_count: int = 0
         processed: set[str] = already_processed(listing)
         for i, doc in enumerate(tqdm(docs, total=len(docs), desc="Processing items"), start=1):
@@ -694,8 +719,8 @@ def main() -> int:
                 appended: bool = process_pid_for_extracted_text(client, pid, combined_txt_path, listing)
                 if appended:
                     appended_count += 1
-                    # If a test limit is provided, stop once we've appended that many texts
-                    if args.test_limit is not None and appended_count >= args.test_limit:
+                    # If an effective limit is provided, stop once we've appended that many texts in THIS run
+                    if effective_limit is not None and appended_count >= effective_limit:
                         # persist before stopping
                         update_summary(listing, combined_txt_path, listing_json_path)
                         save_listing(listing_json_path, listing)
