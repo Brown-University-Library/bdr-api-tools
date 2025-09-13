@@ -14,7 +14,7 @@ import argparse
 import json
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 import httpx
@@ -28,9 +28,17 @@ STORAGE_URL_TPL = f'{BASE}/storage/{{pid}}/EXTRACTED_TEXT/'
 
 def _now_iso() -> str:
     """
-    Returns an ISO-8601 UTC timestamp with timezone info.
+    Returns an ISO-8601 local timestamp with timezone info.
     """
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now().astimezone().isoformat()
+
+
+def _now_compact_local() -> str:
+    """
+    Returns a filesystem-safe local timestamp like YYYYmmddTHHMMSS-0500
+    (offset varies by local timezone). Useful for naming directories.
+    """
+    return datetime.now().astimezone().strftime('%Y%m%dT%H%M%S%z')
 
 
 def _sleep(backoff_s: float) -> None:
@@ -345,9 +353,13 @@ def main() -> int:
     out_dir = Path(args.output_dir).expanduser().resolve()
     ensure_dir(out_dir)
 
+    # create a timestamped subdirectory within the output directory for this run
+    ts_dir = out_dir / f'run-{_now_compact_local()}'
+    ensure_dir(ts_dir)
+
     # output files
-    combined_txt_path = out_dir / f'extracted_text_for_collection_pid-{collection_pid.replace(":", "_")}.txt'
-    listing_json_path = out_dir / f'listing_for_collection_pid-{collection_pid.replace(":", "_")}.json'
+    combined_txt_path = ts_dir / f'extracted_text_for_collection_pid-{collection_pid.replace(":", "_")}.txt'
+    listing_json_path = ts_dir / f'listing_for_collection_pid-{collection_pid.replace(":", "_")}.json'
 
     listing = load_listing(listing_json_path)
 
