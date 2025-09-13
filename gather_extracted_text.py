@@ -130,6 +130,29 @@ def fetch_item_json(client: httpx.Client, pid: str) -> dict[str, object]:
     return resp.json()
 
 
+def collection_title_from_json(coll_json: dict[str, object]) -> str:
+    """
+    Computes a human-friendly collection title from a collection's item-api JSON.
+    Uses the collection's `name` and, when available, the last ancestor's name/title
+    to append a source in the form " -- (from {parent})".
+    """
+    coll_name: str = coll_json.get('name') or ''  # type: ignore[assignment]
+    parent_name: str = ''
+    ancestors: object = coll_json.get('ancestors')
+    if isinstance(ancestors, list) and ancestors:
+        last: object = ancestors[-1]
+        if isinstance(last, dict):
+            parent_name = last.get('name') or last.get('title') or ''  # type: ignore[assignment]
+        elif isinstance(last, str):
+            parent_name = last
+    coll_title: str = ''
+    if coll_name and parent_name:
+        coll_title = f"{coll_name} -- (from {parent_name})"
+    else:
+        coll_title = coll_name or ''
+    return coll_title
+
+
 def _extract_child_pids(item_json: dict[str, object]) -> list[str]:
     """
     Extracts child pids from relations.hasPart, supporting list[str] or list[dict].
@@ -413,19 +436,7 @@ def main() -> int:
         # record collection metadata in summary
         try:
             coll_json: dict[str, object] = fetch_item_json(client, collection_pid)
-            coll_name: str = coll_json.get('name') or ''  # type: ignore[assignment]
-            parent_name: str = ''
-            ancestors: object = coll_json.get('ancestors')  # this is helpful for a collection-title like "Theses & Dissertations"
-            if isinstance(ancestors, list) and ancestors:
-                last: object = ancestors[-1]
-                if isinstance(last, dict):
-                    parent_name = last.get('name') or last.get('title') or ''  # type: ignore[assignment]
-                elif isinstance(last, str):
-                    parent_name = last
-            if coll_name and parent_name:
-                coll_title: str = f"{coll_name} -- (from {parent_name})"
-            else:
-                coll_title = coll_name or ''
+            coll_title: str = collection_title_from_json(coll_json)
         except Exception:
             coll_title = ''
         listing['summary']['collection_pid'] = collection_pid
