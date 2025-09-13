@@ -399,12 +399,16 @@ def find_latest_prior_run_dir(out_dir: Path, safe_collection_pid: str) -> Path |
             try:
                 with ck.open('r', encoding='utf-8') as fh:
                     data: dict[str, object] = json.load(fh)
+                # Only resume from a run whose checkpoint explicitly indicates incomplete
                 if not bool(data.get('completed', False)) and listing_p.exists():
                     return cand
+                # If checkpoint says completed, skip this candidate (do not fall back to listing)
+                continue
             except Exception:
-                # ignore malformed checkpoints; fall through to listing heuristic
+                # Malformed checkpoint: allow fallback to listing heuristic
                 pass
-        if listing_p.exists():
+        # Only use listing heuristic when no checkpoint file exists for the candidate
+        if not ck.exists() and listing_p.exists():
             return cand
     return None
 
