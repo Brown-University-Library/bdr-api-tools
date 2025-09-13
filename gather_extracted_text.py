@@ -215,6 +215,9 @@ def load_listing(path: Path) -> dict:
             # paths recorded as "parent-dir/filename" (no full absolute path)
             'combined_text_path': '',
             'listing_path': '',
+            # collection metadata
+            'collection_pid': '',
+            'collection_primary_title': '',
         },
         'items': []
     }
@@ -392,6 +395,15 @@ def main() -> int:
     timeout = httpx.Timeout(connect=30.0, read=60.0, write=60.0, pool=30.0)
     limits = httpx.Limits(max_keepalive_connections=10, max_connections=10)
     with httpx.Client(headers=headers, timeout=timeout, limits=limits) as client:
+        # record collection metadata in summary
+        try:
+            coll_json = fetch_item_json(client, collection_pid)
+            coll_title = coll_json.get('primary_title') or coll_json.get('mods_title_full_primary_tsi') or ''
+        except Exception:
+            coll_title = ''
+        listing['summary']['collection_pid'] = collection_pid
+        listing['summary']['collection_primary_title'] = coll_title
+
         # enumerate collection via search-api
         docs = search_collection_pids(client, collection_pid)
         if not docs:
