@@ -244,8 +244,7 @@ def load_listing(path: Path) -> dict[str, object]:
     return {
         'summary': {
             'timestamp': _now_iso(),
-            'all_extracted_text_file_size_bytes': 0,
-            'all_extracted_text_file_size_human': '0 Bytes',
+            'all_extracted_text_file_size': '0 Bytes',
             'count_of_all_extracted_text_files': 0,
             # paths recorded as "parent-dir/filename" (no full absolute path)
             'combined_text_path': '',
@@ -325,8 +324,10 @@ def update_summary(listing: dict[str, object], combined_path: Path, listing_path
     count: int = sum(1 for d in listing.get('items', []) if d.get('extracted_text_file_size'))
     size: int = combined_path.stat().st_size if combined_path.exists() else 0
     listing['summary']['count_of_all_extracted_text_files'] = count
-    listing['summary']['all_extracted_text_file_size_bytes'] = size
-    listing['summary']['all_extracted_text_file_size_human'] = humanize.naturalsize(size)
+    # remove deprecated keys if present
+    listing['summary'].pop('all_extracted_text_file_size_bytes', None)
+    listing['summary'].pop('all_extracted_text_file_size_human', None)
+    listing['summary']['all_extracted_text_file_size'] = humanize.naturalsize(size)
     listing['summary']['timestamp'] = _now_iso()
     # store paths in parent-dir/filename form (no full absolute path)
     listing['summary']['combined_text_path'] = _parent_dir_and_name(combined_path)
