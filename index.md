@@ -6,6 +6,7 @@ Collection of small utilities, easily run from anywhere via the wonderful python
 ## tools listing
 
 - [calc_collection_size.py](#calc_collection_sizepy)
+- [gather_extracted_text.py](#gather_extracted_textpy)
 - [show_zip_info.py](#show_zip_infopy)
 
 ---
