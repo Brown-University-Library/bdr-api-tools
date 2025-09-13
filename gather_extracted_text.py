@@ -26,6 +26,7 @@ BASE = 'https://repository.library.brown.edu'
 SEARCH_URL = f'{BASE}/api/search/'
 ITEM_URL_TPL = f'{BASE}/api/items/{{pid}}/'
 STORAGE_URL_TPL = f'{BASE}/storage/{{pid}}/EXTRACTED_TEXT/'
+COLLECTION_URL_TPL = f'{BASE}/api/collections/{{pid}}/'
 
 
 def _now_iso() -> str:
@@ -125,6 +126,16 @@ def fetch_item_json(client: httpx.Client, pid: str) -> dict[str, object]:
     Fetches item-api json for a pid.
     """
     url: str = ITEM_URL_TPL.format(pid=pid)
+    resp: httpx.Response = _retrying_get(client, url)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def fetch_collection_json(client: httpx.Client, pid: str) -> dict[str, object]:
+    """
+    Fetches collection-api json for a collection pid.
+    """
+    url: str = COLLECTION_URL_TPL.format(pid=pid)
     resp: httpx.Response = _retrying_get(client, url)
     resp.raise_for_status()
     return resp.json()
@@ -435,7 +446,7 @@ def main() -> int:
     with httpx.Client(headers=headers, timeout=timeout, limits=limits) as client:
         # record collection metadata in summary
         try:
-            coll_json: dict[str, object] = fetch_item_json(client, collection_pid)
+            coll_json: dict[str, object] = fetch_collection_json(client, collection_pid)
             coll_title: str = collection_title_from_json(coll_json)
         except Exception:
             coll_title = ''
