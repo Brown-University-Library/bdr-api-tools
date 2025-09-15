@@ -75,14 +75,14 @@ Human: 239.49 GB
 
 ### gather_extracted_text.py (detailed)
 
-Collects EXTRACTED_TEXT BDR data-streams across all items in the given collection, writing a single combined text file (prefixed by PID delimiters) and a detailed listing JSON. It enumerates members via the Search API, locates EXTRACTED_TEXT links (parent or hasPart child), streams content with retries/throttling, and saves progress after every item to support interruptions and resuming without overloading the server. It shows a progress display, and offers an optional --test-limit flag for testing convenience, and human-readable size summaries.
+Collects EXTRACTED_TEXT BDR data-streams across all items in the given collection, writing a single combined text file (prefixed by PID delimiters) and a detailed listing JSON. It enumerates members via the Search API, locates EXTRACTED_TEXT links (parent or hasPart child), streams content with retries/throttling, and saves progress after every item to support interruptions and resuming without overloading the server. It shows a progress display, uses human-readable size summaries, and offers an optional `--test-limit` flag for testing convenience. Because many collections with text are named "Theses and Dissertations", the collection name also shows the parent, for context, as in the example below.
 
 Args: --collection-pid (required), --output-dir (required), --test-limit (optional).
 
 
 Example usage:
 ```
-uv run gather_extracted_text.py --collection-pid bdr:bfttpwkj --output-dir "../output_dir" --test-limit 2
+uv run https://brown-university-library.github.io/bdr-api-tools/gather_extracted_text.py --collection-pid bdr:bfttpwkj --output-dir "../output_dir" --test-limit 2
 ```
 
 Output:
