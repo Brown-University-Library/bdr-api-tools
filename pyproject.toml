@@ -15,11 +15,11 @@ prod = []
 llm_code_directives = [
   "use python-3.12 type-hints everywhere for functions and variables; avoid unnecessary `typing` imports via using generics",
   "structure scripts with `if __name__ == '__main__': main()`",
-  "keep main() as simple as possible; delegate to subroutines",
+  "keep main() as simple as possible; delegate to helper functions",
   "for tests, use standard unittest framework, not pytest",
   "to run tests, always use `uv`; example: `uv run -m unittest discover -v`",
   "use httpx for all HTTP calls",
   "don't use functions within functions",
   "prefer single-return functions",
-  "use present-tense triple-quoted function docstrings -- example, `Parses...` not `Parse...`",
+  "use present-tense triple-quoted function docstrings -- example: """\nParses... (not Parse...)\n"""
 ]
