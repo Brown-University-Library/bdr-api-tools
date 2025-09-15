@@ -13,6 +13,12 @@ It preserves current CLI behavior and public functions used by tests (notably `c
 All design choices below are made to align with these guidelines.
 
 
+## 0) Maintainer preferences for this refactor
+
+- Keep `main()` as an independent manager function. Do not bundle it into another class.
+- Only introduce a class if it will have three or more methods. If a concept would result in fewer than three methods, keep the logic as standalone functions for now.
+
+
 ## 1) Current system overview
 
 `gather_extracted_text.py` currently contains 30 functions that together:
@@ -115,7 +121,7 @@ CLI:
 
 ## 4) Proposed class structure
 
-The following classes group related functions and responsibilities. Most are light wrappers rather than heavy state holders. Where state is useful (paths, listing store, checkpoint “created_at”), it is maintained explicitly.
+The following classes group related functions and responsibilities. Only classes with three or more methods are introduced; otherwise, logic remains as standalone functions.
 
 - ApiClient
   - Purpose: Encapsulates all `httpx` interactions and retry policies.
@@ -148,9 +154,8 @@ The following classes group related functions and responsibilities. Most are lig
     - `find_latest_prior_run_dir() -> Path | None`
     - `copy_prior_outputs(prior_dir: Path) -> None`
     - `paths() -> tuple[Path, Path, Path]` to return `(combined_txt, listing_json, checkpoint_json)` for the run.
-    - `parent_dir_and_name(p: Path) -> str`
   - Notes:
-    - Wraps `ensure_dir()`.
+    - Uses the standalone `ensure_dir()` helper and the standalone `_parent_dir_and_name()` helper where needed.
 
 - ListingStore
   - Purpose: Own in-memory listing dict and I/O to listing JSON; provide helper queries/updates.
@@ -161,58 +166,23 @@ The following classes group related functions and responsibilities. Most are lig
     - `save() -> None` (from `save_listing`)
     - `add_entry(item_pid: str, primary_title: str, item_api_url: str, studio_url: str, size: int | None, status: str | None = None) -> None` (from `add_listing_entry` + status tagging)
     - `processed_set() -> set[str]` (from `already_processed`/`processed_set_from_listing`)
-    - `update_summary(combined_path: Path) -> None` (from `update_summary`; uses `parent_dir_and_name` for both combined and self.path)
+    - `update_summary(combined_path: Path) -> None` (from `update_summary`; uses the standalone `_parent_dir_and_name()` for both combined and self.path)
     - `counts(total_docs: int) -> dict[str, int]` (from `counts_from_listing`)
     - Getters for summary fields (`collection_pid`, `collection_primary_title`) with in-place set operations.
 
-- CheckpointStore
-  - Purpose: Persist checkpoints with stable `created_at` and fresh counts.
-  - Fields:
-    - `path: Path`, `created_at: str | None`
-  - Key methods:
-    - `save(listing: ListingStore, combined_path: Path, total_docs: int, completed: bool) -> None` (from `save_checkpoint`; `listing_path` derived from `ListingStore.path`)
-    - `load_created_at_if_present() -> None` (one-time read to preserve original `created_at`)
-
-- CombinedTextWriter
-  - Purpose: Append combined text with PID markers.
-  - Fields:
-    - `path: Path`
-  - Key methods:
-    - `append(pid: str, text: str) -> None` (from `append_text`)
-
-- ExtractedTextProcessor
-  - Purpose: Orchestrate per-pid processing.
-  - Fields:
-    - `api: ApiClient`, `resolver: TextLinkResolver`, `writer: CombinedTextWriter`, `listing: ListingStore`
-  - Key methods:
-    - `process_pid(pid: str) -> bool` (from `process_pid_for_extracted_text`)
-  - Notes:
-    - Updates listing entries (including `status: forbidden`, `status: forbidden_via_child`, `status: handled_via_child`).
-    - Returns whether any text was appended.
-
-- GatherExtractedTextRunner
-  - Purpose: End-to-end orchestration for one run.
-  - Fields:
-    - `collection_pid: str`, `safe_collection_pid: str`, `out_dir: Path`, `test_limit: int | None`
-  - Key steps in `run() -> int`:
-    1) Prepare run directory and paths; copy forward prior outputs if present.
-    2) Initialize `ListingStore` and `CombinedTextWriter` (touch combined file).
-    3) Initialize `CheckpointStore` (write initial checkpoint with `total_docs=0`).
-    4) Create `httpx.Client`, wrap with `ApiClient`.
-    5) Fetch collection metadata; store in listing summary.
-    6) Fetch docs via search; update checkpoint with `total_docs`.
-    7) Compute `effective_limit` (respecting prior appended items).
-    8) If `effective_limit == 0`, persist and exit.
-    9) Build `ExtractedTextProcessor` and iterate docs:
-       - Skip malformed/processed pids.
-       - Process pid; if appended, increment `appended_count`; honor `effective_limit`.
-       - After each pid: `listing.update_summary()`, `listing.save()`, `checkpoint.save()`.
-    10) After loop, final persist with `completed = True`.
+Intentionally not classes (kept as functions for now):
+- `_now_iso()`, `_now_compact_local()`, `_sleep()` — simple time/clock helpers.
+- `_parent_dir_and_name(p: Path)` — string helper for displaying relative paths.
+- `append_text(out_txt_path, pid, text)` — single-purpose I/O helper.
+- `process_pid_for_extracted_text(client, pid, out_txt_path, listing)` — orchestrates per-pid processing.
+- `save_checkpoint(checkpoint_path, ..., listing, combined_path, listing_path, total_docs, completed)` — persists checkpoint with stable `created_at`.
+- `ensure_dir(path)` — simple directory creation helper used by `RunDirectoryManager`.
+- `main()` — remains the independent manager function that orchestrates the run using the classes above.
 
 
 ## 5) Backwards compatibility guarantees
 
-- Keep `collection_title_from_json()` import path stable. The function will remain at module level or be re-exported from `gather_extracted_text.py` even if its implementation lives in a class (e.g., `CollectionTitle` or `TextLinkResolver`).
+- Keep `collection_title_from_json()` import path stable. The function remains at module level (standalone) and continues to be importable from `gather_extracted_text.py`.
 - For other existing top-level functions, provide thin wrappers for one release cycle:
   - Each wrapper delegates to the corresponding class method to avoid duplication while preserving the public API for callers (if any exist beyond this repo).
 - Preserve CLI behavior precisely, including:
@@ -225,9 +195,7 @@ The following classes group related functions and responsibilities. Most are lig
 ## 6) Old-to-new mapping (proposed)
 
 Utilities:
-- `_now_iso` -> `SystemClock.now_iso()` (or remain a small module-level util if preferred)
-- `_now_compact_local` -> `SystemClock.now_compact_local()`
-- `_sleep` -> `SystemClock.sleep()` (or local helper inside `ApiClient` retry loop)
+- Keep `_now_iso`, `_now_compact_local`, and `_sleep` as standalone helpers. They are simple and widely reusable.
 
 HTTP/Network:
 - `_retrying_get` -> `ApiClient.get_with_retries()`
@@ -237,14 +205,14 @@ HTTP/Network:
 - `fetch_collection_json` -> `ApiClient.fetch_collection_json()`
 
 Item parsing / title / link discovery:
-- `collection_title_from_json` -> keep as-is or `CollectionTitle.from_json()` with top-level re-export
+- `collection_title_from_json` -> keep at module level (optionally internally call `TextLinkResolver` helpers if desired)
 - `_extract_child_pids` -> `TextLinkResolver.extract_child_pids()`
 - `_find_extracted_text_link_and_size` -> `TextLinkResolver.find_link_and_size()`
 - `_extract_size_from_datastreams` -> `TextLinkResolver.extract_size_from_datastreams()`
 
 Filesystem / run-dir:
-- `ensure_dir` -> `RunDirectoryManager.ensure_dir()` (or static `Filesystem.ensure_dir()`)
-- `_parent_dir_and_name` -> `RunDirectoryManager.parent_dir_and_name()`
+- `ensure_dir` -> keep as standalone helper used by `RunDirectoryManager`
+- `_parent_dir_and_name` -> keep as standalone helper (used by `ListingStore.update_summary()` and `save_checkpoint()`)
 - `_run_dir_name_for` -> `RunDirectoryManager.run_dir_name_for()`
 - `_is_run_dir_for` -> internal helper in `RunDirectoryManager`
 - `find_latest_prior_run_dir` -> `RunDirectoryManager.find_latest_prior_run_dir()`
@@ -256,18 +224,18 @@ Listing management:
 - `add_listing_entry` -> `ListingStore.add_entry()`
 - `already_processed`/`processed_set_from_listing` -> `ListingStore.processed_set()`
 - `counts_from_listing` -> `ListingStore.counts()`
-- `update_summary` -> `ListingStore.update_summary()`
+- `update_summary` -> `ListingStore.update_summary()` (uses `_parent_dir_and_name` helper)
 
 Checkpoint:
-- `save_checkpoint` -> `CheckpointStore.save()`
+- `save_checkpoint` -> keep as a standalone function (uses `_parent_dir_and_name` and `ListingStore.counts()`)
 
 Per-pid processing:
-- `append_text` -> `CombinedTextWriter.append()`
-- `process_pid_for_extracted_text` -> `ExtractedTextProcessor.process_pid()`
+- `append_text` -> keep as a standalone function
+- `process_pid_for_extracted_text` -> keep as a standalone function (internally use `ApiClient` and `TextLinkResolver` where appropriate)
 
 CLI:
 - `parse_args` -> keep as-is
-- `main` -> call `GatherExtractedTextRunner.run()`
+- `main` -> remains the independent manager function orchestrating the run using the classes and helpers above
 
 
 ## 7) Data model snapshots (for reference)
@@ -292,31 +260,32 @@ Statuses used in listing items:
    - Minimal change path: define classes within `gather_extracted_text.py` first, then consider extracting to modules later if desired (`api_client.py`, `run_dir.py`, etc.).
    - Keep constants and logging at the top of `gather_extracted_text.py`.
 
-2. Implement `RunDirectoryManager`, `ListingStore`, `CheckpointStore`, `CombinedTextWriter`.
+2. Implement `RunDirectoryManager` and `ListingStore`.
    - Wire in existing functions and move logic as-is.
-   - Ensure `ListingStore.update_summary()` and `CheckpointStore.save()` both use `parent_dir_and_name()` to keep relative path semantics identical.
+   - Ensure `ListingStore.update_summary()` and `save_checkpoint()` both use the standalone `_parent_dir_and_name()` helper to keep relative path semantics identical.
 
 3. Implement `ApiClient` and `TextLinkResolver`.
    - Move retry logic; reuse `httpx.Client` provided by `main`.
    - Ensure request throttling and backoff behavior remains identical.
 
-4. Implement `ExtractedTextProcessor`.
-   - Port `process_pid_for_extracted_text()` logic with careful handling of 403 cases and child walks.
+4. Keep `process_pid_for_extracted_text()` as a standalone function.
+   - Internally use `ApiClient` and `TextLinkResolver` to reduce parameter passing and centralize HTTP/JSON parsing, while preserving behavior (403 handling, child traversal).
 
-5. Implement `GatherExtractedTextRunner.run()` and refactor `main()` to delegate to it.
-   - Keep CLI behavior unchanged.
+5. Keep `main()` as the independent manager function.
+   - Refactor its internals to instantiate and use `RunDirectoryManager`, `ListingStore`, `ApiClient`, and `TextLinkResolver` as above.
+   - Preserve CLI behavior unchanged.
 
 6. Provide thin wrappers for key old functions:
    - E.g., `def fetch_item_json(client, pid): return ApiClient(client).fetch_item_json(pid)`.
-   - For `collection_title_from_json`, either keep as-is or call `CollectionTitle.from_json()` internally.
+   - For `collection_title_from_json`, keep it as-is (standalone function).
 
 7. Validate against existing tests.
    - `tests/test_collection_title.py` imports `collection_title_from_json` from `gather_extracted_text`. Ensure this remains true.
 
 8. Manual sanity checks against a small collection PID with and without `--test-limit`.
 
-9. Optional: Extract classes to separate modules for long-term organization.
-   - Update `gather_extracted_text.py` to import and re-export as needed.
+9. Optional: Extract classes to separate modules for long-term organization once stable.
+   - Update `gather_extracted_text.py` to import and re-export as needed while keeping `main()`.
 
 
 ## 9) Risks and mitigations
@@ -336,7 +305,7 @@ Statuses used in listing items:
 - CLI usage and outputs are unchanged for end users.
 - `tests/test_collection_title.py` continues to pass without modifications.
 - Checkpoint and listing JSON schemas remain unchanged.
-- The code is reorganized into cohesive classes, and `main()` delegates orchestration to a runner object.
+- The code is reorganized into cohesive classes where appropriate (3+ methods), and `main()` remains the independent manager function orchestrating the run using those classes and helper functions.
 - All new/ported functions and methods use 3.12 type hints and present-tense docstrings.
 
 
