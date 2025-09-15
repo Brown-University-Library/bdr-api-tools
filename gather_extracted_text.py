@@ -9,6 +9,20 @@
 
 """
 Collects extracted_text for a collection.
+It's server-friendly, in that it makes synchronous requests with a slight sleep, 
+  and saves progress after every item so it can be resumed after a network failure 
+  and will continue from where it left off.
+
+Usage:
+  uv run ./gather_extracted_text.py --collection-pid bdr:bfttpwkj --output-dir "../output_dir" 
+
+Args:
+  --collection-pid (required)
+  --output-dir (required)
+  --test-limit (optional) -- convenient for testing
+
+Note: 
+- this script works, but consists of 30 functions. It'll soon be refactored to use classes for more sane organization.
 """
 
 import argparse
