@@ -1,20 +1,57 @@
-Collection of small utilities, easily run from anywhere via the wonderful python package-manager, `uv` ([link](https://docs.astral.sh/uv/)).
+# About bdr-api-tools
+
+This is collection of small utilities for interacting with the Brown Digital Repository (BDR) [APIs](https://github.com/Brown-University-Library/bdr_api_documentation/wiki). The tools are designed to be easily run from anywhere via the wonderful python package-manager, `uv` ([link](https://docs.astral.sh/uv/)) -- which allows referencing these tools via a URL. No special installation of python or virtual-environments or dependency-packages is required. Just [installing](https://docs.astral.sh/uv/getting-started/installation/) `uv` is enough to let you run these tools like this:
+
+```bash
+uv run https://brown-university-library.github.io/bdr-api-tools/calc_collection_size.py --collection-pid bdr:bwehb8b8
+```
+
+For Brown community members, a recommendation: if you're off-campus, enable [Brown-VPN](https://it.brown.edu/services/virtual-private-network-vpn) before using these tools. The reason: We've had to enable certain protections to prevent problems due to excessive bot-traffic. If you're on VPN, you'll minimize the chance of being blocked when the BDR-APIs are accessed.
 
 ---
 
 
 ## tools listing
 
-- [calc_collection_size.py](#calc_collection_sizepy)
-- [gather_extracted_text.py](#gather_extracted_textpy)
-- [show_zip_info.py](#show_zip_infopy)
+- calc_collection_size.py ([brief](#calc_collection_sizepy-brief)), ([detailed](#calc_collection_sizepy-detailed))
+- gather_extracted_text.py ([brief](#gather_extracted_textpy-brief)), ([detailed](#gather_extracted_textpy-detailed))
+- show_zip_info.py ([brief](#show_zip_infopy-brief)), ([detailed](#show_zip_infopy-detailed))
+
+---
+---
+
+
+## brief info
+
+### calc_collection_size.py (brief)
+
+Calculates the total storage size of all items in the given BDR collection. It queries the Search API with pagination to retrieve and process the necessary data, and prints a summary including a human-readable size. It separately fetches the collection title via the Collections API. 
 
 ---
 
 
-## calc_collection_size.py
+### gather_extracted_text.py (brief)
 
-Calculates the size of a collection in the Brown Digital Repository.
+Collects EXTRACTED_TEXT across all items (parent & child) in a collection, writing a single combined text file and a detailed listing JSON. It saves progress to support interruptions and resuming without overloading the server, and offers an optional --test-limit flag for testing convenience. 
+
+---
+
+### show_zip_info.py (brief)
+
+Fetches data from the item-api and summarizes zip-file contents for the givenitem -- AND zip-file contents for all child-items. It computes per-item and aggregate-summary filetype counts based on extension, and outputs a structured JSON with _meta_ and item_info.
+
+---
+---
+
+
+## detailed info
+
+
+### calc_collection_size.py (detailed)
+
+Calculates the total storage size of all items in the given BDR collection. It queries the Search API with pagination to retrieve and process the necessary data, and prints a summary including a human-readable size. It separately fetches the collection title via the Collections API. 
+
+Args: --collection-pid (required)
 
 Example usage:
 ```
@@ -36,9 +73,12 @@ Human: 239.49 GB
 ---
 
 
-## gather_extracted_text.py 
+### gather_extracted_text.py (detailed)
 
-Collects EXTRACTED_TEXT BDR data-streams across all items in the given collection, writing a single combined text file (prefixed by PID delimiters) and a detailed listing json file with a summary. 
+Collects EXTRACTED_TEXT BDR data-streams across all items in the given collection, writing a single combined text file (prefixed by PID delimiters) and a detailed listing JSON. It enumerates members via the Search API, locates EXTRACTED_TEXT links (parent or hasPart child), streams content with retries/throttling, and saves progress after every item to support interruptions and resuming without overloading the server. It shows a progress display, and offers an optional --test-limit flag for testing convenience, and human-readable size summaries.
+
+Args: --collection-pid (required), --output-dir (required), --test-limit (optional).
+
 
 Example usage:
 ```
@@ -119,9 +159,11 @@ Not `cat`-ing the `extracted_text_for_collection_pid-bdr_bfttpwkj.txt` -- it con
 ---
 
 
-## show_zip_info.py
+### show_zip_info.py (detailed)
 
-Fetches BDR item-api data and extracts and summarizes zip file data for item and and any `hasParts` child-items.
+Fetches data from the item-api and summarizes (based on extension) zip-file contents for the given item. It also lists, and summarizes, zip-file contents for all child-items. In addition to the per-item summary, it also summarizes the filetype counts across both parent and all child-items.
+
+Args: --item_pid (required).
 
 Example usage:
 ```
@@ -199,4 +241,5 @@ Output (excerpt):
 
 [Code](https://github.com/Brown-University-Library/bdr-api-tools/blob/main/show_zip_info.py)
 
+---
 ---
