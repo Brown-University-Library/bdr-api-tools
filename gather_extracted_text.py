@@ -20,6 +20,11 @@ Args:
   --collection-pid (required)
   --output-dir (required)
   --test-limit (optional) -- convenient for testing
+
+TODO:
+- I just refactored 30 top-level functions into classes.
+- I want to add docstrings to the classes -- and lots of comments to the main() function --
+  to make the code easier to follow.
 """
 
 import argparse
@@ -70,9 +75,13 @@ class CollectionMetadata:
     @staticmethod
     def title_from_json(coll_json: dict[str, object]) -> str:
         """
-        Computes a human-friendly collection title from a collection's item-api JSON.
+        Prepares a customized collection-title from a collection's item-api JSON.
+
         Uses the collection's `name` and, when available, the last ancestor's name/title
         to append a source in the form " -- (from {parent})".
+
+        The reason is because lots of collections make be named "Theses and Dissertations",
+        and I want users to be able to see at a glance which collection they're a part of.
         """
         coll_name: str = coll_json.get('name') or ''  # type: ignore[assignment]
         parent_name: str = ''
