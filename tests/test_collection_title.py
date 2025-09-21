@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 # Import from the project root (bdr-api-tools). Pytest/unittest usually adds this to sys.path when run from the repo root.
-from gather_extracted_text import collection_title_from_json
+from gather_extracted_text import CollectionMetadata
 
 
 class TestCollectionTitleFromJson(unittest.TestCase):
@@ -19,7 +19,7 @@ class TestCollectionTitleFromJson(unittest.TestCase):
         with fixture_path.open('r', encoding='utf-8') as fh:
             coll_json: dict[str, object] = json.load(fh)
 
-        computed: str = collection_title_from_json(coll_json)
+        computed: str = CollectionMetadata.title_from_json(coll_json)
         expected: str = 'Theses and Dissertations -- (from Computer Science)'
         self.assertEqual(computed, expected)
 
