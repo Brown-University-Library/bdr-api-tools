@@ -130,6 +130,48 @@ def _retrying_stream_text(client: httpx.Client, url: str, *, max_tries: int = 4,
     raise last_exc
 
 
+class ApiClient:
+    """
+    Encapsulates httpx interactions and retry policies.
+
+    Holds a reference to an externally-managed httpx.Client.
+    """
+    client: httpx.Client
+
+    def __init__(self, client: httpx.Client):
+        self.client = client
+
+    def get_with_retries(self, url: str, *, max_tries: int = 4, timeout_s: float = 30.0) -> httpx.Response:
+        """
+        Performs GET with retries using module backoff helper.
+        """
+        return _retrying_get(self.client, url, max_tries=max_tries, timeout_s=timeout_s)
+
+    def stream_text_with_retries(self, url: str, *, max_tries: int = 4, timeout_s: float = 60.0) -> str:
+        """
+        Streams text with retries using module backoff helper.
+        """
+        return _retrying_stream_text(self.client, url, max_tries=max_tries, timeout_s=timeout_s)
+
+    def search_collection_pids(self, collection_pid: str) -> list[dict[str, object]]:
+        """
+        Searches collection members via search-api.
+        """
+        return search_collection_pids(self.client, collection_pid)
+
+    def fetch_item_json(self, pid: str) -> dict[str, object]:
+        """
+        Fetches item-api JSON for a pid.
+        """
+        return fetch_item_json(self.client, pid)
+
+    def fetch_collection_json(self, pid: str) -> dict[str, object]:
+        """
+        Fetches collection-api JSON for a collection pid.
+        """
+        return fetch_collection_json(self.client, pid)
+
+
 def search_collection_pids(client: httpx.Client, collection_pid: str) -> list[dict[str, object]]:
     """
     Uses search-api to list items in a collection, returning docs with pid & primary_title.
@@ -202,6 +244,30 @@ def collection_title_from_json(coll_json: dict[str, object]) -> str:
     return coll_title
 
 
+class TextLinkResolver:
+    """
+    Finds EXTRACTED_TEXT links and sizes and extracts child pids.
+    """
+
+    def extract_child_pids(self, item_json: dict[str, object]) -> list[str]:
+        """
+        Extracts child pids from relations.hasPart, supporting list[str] or list[dict].
+        """
+        return _extract_child_pids(item_json)
+
+    def extract_size_from_datastreams(self, item_json: dict[str, object]) -> int | None:
+        """
+        Extracts EXTRACTED_TEXT size from datastreams block if present.
+        """
+        return _extract_size_from_datastreams(item_json)
+
+    def find_link_and_size(self, item_json: dict[str, object], pid: str) -> tuple[str, int | None] | None:
+        """
+        Locates EXTRACTED_TEXT download URL and optional size.
+        """
+        return _find_extracted_text_link_and_size(item_json, pid)
+
+
 def _extract_child_pids(item_json: dict[str, object]) -> list[str]:
     """
     Extracts child pids from relations.hasPart, supporting list[str] or list[dict].
@@ -271,6 +337,60 @@ def ensure_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
 
+class RunDirectoryManager:
+    """
+    Manages run directory naming, discovery of prior runs, and path utilities.
+    """
+
+    out_dir: Path
+    safe_collection_pid: str
+    run_dir: Path | None
+
+    def __init__(self, out_dir: Path, safe_collection_pid: str):
+        self.out_dir = out_dir
+        self.safe_collection_pid = safe_collection_pid
+        self.run_dir = None
+
+    def run_dir_name_for(self) -> str:
+        """
+        Returns timestamped run directory name.
+        """
+        return _run_dir_name_for(self.safe_collection_pid)
+
+    def create_run_dir(self) -> Path:
+        """
+        Creates and returns the run directory path for this execution.
+        """
+        name = self.run_dir_name_for()
+        rd = self.out_dir / name
+        ensure_dir(rd)
+        self.run_dir = rd
+        return rd
+
+    def find_latest_prior_run_dir(self) -> Path | None:
+        """
+        Finds the latest prior run directory for resume support.
+        """
+        return find_latest_prior_run_dir(self.out_dir, self.safe_collection_pid)
+
+    def copy_prior_outputs(self, prior_dir: Path) -> None:
+        """
+        Copies combined text and listing JSON from a prior run.
+        """
+        assert self.run_dir is not None
+        copy_prior_outputs(prior_dir, self.run_dir, self.safe_collection_pid)
+
+    def paths(self) -> tuple[Path, Path, Path]:
+        """
+        Returns paths for combined text, listing, and checkpoint JSON.
+        """
+        assert self.run_dir is not None
+        combined_txt_path = self.run_dir / f'extracted_text_for_collection_pid-{self.safe_collection_pid}.txt'
+        listing_json_path = self.run_dir / f'listing_for_collection_pid-{self.safe_collection_pid}.json'
+        checkpoint_json_path = self.run_dir / f'checkpoint_for_collection_pid-{self.safe_collection_pid}.json'
+        return (combined_txt_path, listing_json_path, checkpoint_json_path)
+
+
 def load_listing(path: Path) -> dict[str, object]:
     """
     Loads listing json if present; otherwise returns initial structure.
@@ -302,6 +422,70 @@ def save_listing(path: Path, listing: dict[str, object]) -> None:
     listing['summary']['timestamp'] = _now_iso()
     with path.open('w', encoding='utf-8') as fh:
         json.dump(listing, fh, ensure_ascii=False, indent=2)
+
+
+class ListingStore:
+    """
+    Owns listing data and handles persistence and queries.
+    """
+
+    path: Path
+    data: dict[str, object]
+
+    def __init__(self, path: Path):
+        self.path = path
+        self.data = {}
+
+    def load_or_init(self) -> None:
+        """
+        Loads listing from disk or initializes a default structure.
+        """
+        self.data = load_listing(self.path)
+
+    def save(self) -> None:
+        """
+        Saves listing JSON to disk.
+        """
+        save_listing(self.path, self.data)
+
+    def add_entry(
+        self,
+        *,
+        item_pid: str,
+        primary_title: str,
+        full_item_api_url: str,
+        full_studio_url: str,
+        extracted_text_file_size: int | None,
+    ) -> None:
+        """
+        Adds or replaces a listing entry.
+        """
+        add_listing_entry(
+            self.data,
+            item_pid=item_pid,
+            primary_title=primary_title,
+            full_item_api_url=full_item_api_url,
+            full_studio_url=full_studio_url,
+            extracted_text_file_size=extracted_text_file_size,
+        )
+
+    def processed_set(self) -> set[str]:
+        """
+        Returns set of processed PIDs.
+        """
+        return processed_set_from_listing(self.data)
+
+    def update_summary(self, combined_path: Path) -> None:
+        """
+        Updates summary for combined path and this store's listing path.
+        """
+        update_summary(self.data, combined_path, self.path)
+
+    def counts(self, *, total_docs: int = 0) -> dict[str, int]:
+        """
+        Returns counts for the listing.
+        """
+        return counts_from_listing(self.data, total_docs=total_docs)
 
 
 def append_text(out_txt_path: Path, pid: str, text: str) -> None:
@@ -497,16 +681,18 @@ def process_pid_for_extracted_text(client: httpx.Client, pid: str, out_txt_path:
     - updates listing
     Returns True if appended, else False.
     """
-    item_json: dict[str, object] = fetch_item_json(client, pid)
+    api_client = ApiClient(client)
+    resolver = TextLinkResolver()
+    item_json: dict[str, object] = api_client.fetch_item_json(pid)
     primary_title: str = item_json.get('primary_title') or item_json.get('mods_title_full_primary_tsi') or ''  # type: ignore[assignment]
     studio_url: str = item_json.get('uri') or f'{BASE}/studio/item/{pid}/'  # type: ignore[assignment]
     item_api_url: str = ITEM_URL_TPL.format(pid=pid)
 
-    found: tuple[str, int | None] | None = _find_extracted_text_link_and_size(item_json, pid)
+    found: tuple[str, int | None] | None = resolver.find_link_and_size(item_json, pid)
     if found:
         url, size = found
         try:
-            text: str = _retrying_stream_text(client, url)
+            text: str = api_client.stream_text_with_retries(url)
         except httpx.HTTPStatusError as exc:
             if exc.response is not None and exc.response.status_code == 403:
                 add_listing_entry(
@@ -533,17 +719,17 @@ def process_pid_for_extracted_text(client: httpx.Client, pid: str, out_txt_path:
         return True
 
     # try children via hasPart
-    child_pids: list[str] = _extract_child_pids(item_json)
+    child_pids: list[str] = resolver.extract_child_pids(item_json)
     for child_pid in child_pids:
-        child_json: dict[str, object] = fetch_item_json(client, child_pid)
+        child_json: dict[str, object] = api_client.fetch_item_json(child_pid)
         child_title: str = child_json.get('primary_title') or child_json.get('mods_title_full_primary_tsi') or ''  # type: ignore[assignment]
         child_studio_url: str = child_json.get('uri') or f'{BASE}/studio/item/{child_pid}/'  # type: ignore[assignment]
         child_api_url: str = ITEM_URL_TPL.format(pid=child_pid)
-        child_found: tuple[str, int | None] | None = _find_extracted_text_link_and_size(child_json, child_pid)
+        child_found: tuple[str, int | None] | None = resolver.find_link_and_size(child_json, child_pid)
         if child_found:
             url, size = child_found
             try:
-                text = _retrying_stream_text(client, url)
+                text = api_client.stream_text_with_retries(url)
             except httpx.HTTPStatusError as exc:
                 if exc.response is not None and exc.response.status_code == 403:
                     add_listing_entry(
@@ -628,24 +814,25 @@ def main() -> int:
     out_dir: Path = Path(args.output_dir).expanduser().resolve()
     ensure_dir(out_dir)
 
+    # setup run-directory manager
+    rdm = RunDirectoryManager(out_dir, safe_collection_pid)
+
     # Determine whether to resume from a prior run BEFORE creating the new run directory
-    prior_dir: Path | None = find_latest_prior_run_dir(out_dir, safe_collection_pid)
+    prior_dir: Path | None = rdm.find_latest_prior_run_dir()
 
     # create a timestamped subdirectory within the output directory for this run
-    ts_dir_name: str = _run_dir_name_for(safe_collection_pid)
-    ts_dir: Path = out_dir / ts_dir_name
-    ensure_dir(ts_dir)
+    ts_dir: Path = rdm.create_run_dir()
 
     # output files
-    combined_txt_path: Path = ts_dir / f'extracted_text_for_collection_pid-{safe_collection_pid}.txt'
-    listing_json_path: Path = ts_dir / f'listing_for_collection_pid-{safe_collection_pid}.json'
-    checkpoint_json_path: Path = ts_dir / f'checkpoint_for_collection_pid-{safe_collection_pid}.json'
+    combined_txt_path, listing_json_path, checkpoint_json_path = rdm.paths()
 
     # attempt resume from latest prior run (skipped if --test-limit provided)
     if prior_dir is not None:
-        copy_prior_outputs(prior_dir, ts_dir, safe_collection_pid)
+        rdm.copy_prior_outputs(prior_dir)
     # load listing (copied or new)
-    listing: dict[str, object] = load_listing(listing_json_path)
+    listing_store = ListingStore(listing_json_path)
+    listing_store.load_or_init()
+    listing: dict[str, object] = listing_store.data
     # ensure combined exists if resuming or fresh
     combined_txt_path.touch(exist_ok=True)
     # compute effective remaining limit if a test limit is provided, accounting for prior appended items
@@ -674,8 +861,9 @@ def main() -> int:
     limits: httpx.Limits = httpx.Limits(max_keepalive_connections=10, max_connections=10)
     with httpx.Client(headers=headers, timeout=timeout, limits=limits) as client:
         # record collection metadata in summary
+        api_client = ApiClient(client)
         try:
-            coll_json: dict[str, object] = fetch_collection_json(client, collection_pid)
+            coll_json: dict[str, object] = api_client.fetch_collection_json(collection_pid)
             coll_title: str = collection_title_from_json(coll_json)
         except Exception:
             coll_title = ''
@@ -683,7 +871,7 @@ def main() -> int:
         listing['summary']['collection_primary_title'] = coll_title
 
         # enumerate collection via search-api
-        docs: list[dict[str, object]] = search_collection_pids(client, collection_pid)
+        docs: list[dict[str, object]] = api_client.search_collection_pids(collection_pid)
         # update checkpoint with total_docs
         save_checkpoint(
             checkpoint_json_path,
@@ -701,8 +889,8 @@ def main() -> int:
 
         # If we've already satisfied the limit in a prior run, persist and exit early
         if effective_limit == 0:
-            update_summary(listing, combined_txt_path, listing_json_path)
-            save_listing(listing_json_path, listing)
+            listing_store.update_summary(combined_txt_path)
+            listing_store.save()
             save_checkpoint(
                 checkpoint_json_path,
                 collection_pid=collection_pid,
@@ -763,8 +951,8 @@ def main() -> int:
                 print(f'Error processing {pid}: {exc}', file=sys.stderr)
 
             # persist after each pid for robust resume
-            update_summary(listing, combined_txt_path, listing_json_path)
-            save_listing(listing_json_path, listing)
+            listing_store.update_summary(combined_txt_path)
+            listing_store.save()
             save_checkpoint(
                 checkpoint_json_path,
                 collection_pid=collection_pid,
@@ -778,8 +966,8 @@ def main() -> int:
             )
 
         # final summary update
-        update_summary(listing, combined_txt_path, listing_json_path)
-        save_listing(listing_json_path, listing)
+        listing_store.update_summary(combined_txt_path)
+        listing_store.save()
         save_checkpoint(
             checkpoint_json_path,
             collection_pid=collection_pid,
