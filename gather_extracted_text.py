@@ -14,15 +14,12 @@ It's server-friendly, in that it makes synchronous requests with a slight sleep,
   and will continue from where it left off.
 
 Usage:
-  uv run ./gather_extracted_text.py --collection-pid bdr:bfttpwkj --output-dir "../output_dir" 
+  uv run ./gather_extracted_text.py --collection-pid bdr:bfttpwkj --output-dir "../output_dir" --test-limit 4
 
 Args:
   --collection-pid (required)
   --output-dir (required)
   --test-limit (optional) -- convenient for testing
-
-Note: 
-- this script works, but consists of 30 functions. It'll soon be refactored to use classes for more sane organization.
 """
 
 import argparse
@@ -636,28 +633,6 @@ def _sleep(backoff_s: float) -> None:
     time.sleep(backoff_s)
 
 
-## removed legacy network helpers in favor of ApiClient methods
-
-
-# removed: collection_title_from_json; moved to CollectionMetadata.title_from_json
-
-
-## removed legacy item helpers in favor of ItemTextResolver methods
-
-
-## removed legacy listing helpers in favor of ListingStore methods
-
-
-## removed legacy run-dir helpers in favor of RunDirectoryManager methods
-
-
-## removed legacy checkpoint helper in favor of CheckpointStore methods
-
-
-## removed legacy per-pid processor in favor of ExtractionProcessor
-
-
-## removed legacy parse_args in favor of CLI.parse_args
 
 
 def main() -> int:
