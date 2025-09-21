@@ -9,8 +9,8 @@
 
 """
 Collects extracted_text for a collection.
-It's server-friendly, in that it makes synchronous requests with a slight sleep, 
-  and saves progress after every item so it can be resumed after a network failure 
+It's server-friendly, in that it makes synchronous requests with a slight sleep,
+  and saves progress after every item so it can be resumed after a network failure
   and will continue from where it left off.
 
 Usage:
@@ -85,7 +85,7 @@ class CollectionMetadata:
                 parent_name = last
         coll_title: str = ''
         if coll_name and parent_name:
-            coll_title = f"{coll_name} -- (from {parent_name})"
+            coll_title = f'{coll_name} -- (from {parent_name})'
         else:
             coll_title = coll_name or ''
         return coll_title
@@ -169,7 +169,9 @@ class ItemTextResolver:
         if 'EXTRACTED_TEXT' in ds_block and isinstance(ds_block['EXTRACTED_TEXT'], dict):
             url = self.storage_url_tpl.format(pid=pid)
             size_obj: object = ds_block['EXTRACTED_TEXT'].get('size')  # type: ignore[index]
-            size_int: int | None = int(size_obj) if isinstance(size_obj, int) or (isinstance(size_obj, str) and size_obj.isdigit()) else None
+            size_int: int | None = (
+                int(size_obj) if isinstance(size_obj, int) or (isinstance(size_obj, str) and size_obj.isdigit()) else None
+            )
             return (url, size_int)
         return None
 
@@ -193,7 +195,7 @@ class ApiClient:
                 return resp
             except (httpx.HTTPError, httpx.TransportError) as exc:
                 last_exc = exc
-                _sleep(min(2 ** attempt, 15))
+                _sleep(min(2**attempt, 15))
         assert last_exc is not None
         raise last_exc
 
@@ -211,7 +213,7 @@ class ApiClient:
                     return ''.join(chunks)
             except (httpx.HTTPError, httpx.TransportError) as exc:
                 last_exc = exc
-                _sleep(min(2 ** attempt, 15))
+                _sleep(min(2**attempt, 15))
         assert last_exc is not None
         raise last_exc
 
@@ -342,7 +344,7 @@ class ListingStore:
                 'collection_pid': '',
                 'collection_primary_title': '',
             },
-            'items': []
+            'items': [],
         }
 
     def save(self) -> None:
@@ -382,8 +384,8 @@ class ListingStore:
         self.data['summary']['count_of_all_extracted_text_files'] = count
         self.data['summary']['all_extracted_text_file_size'] = humanize.naturalsize(size)
         self.data['summary']['timestamp'] = _now_iso()
-        self.data['summary']['combined_text_path'] = f"{combined_path.parent.name}/{combined_path.name}"
-        self.data['summary']['listing_path'] = f"{self.path.parent.name}/{self.path.name}"
+        self.data['summary']['combined_text_path'] = f'{combined_path.parent.name}/{combined_path.name}'
+        self.data['summary']['listing_path'] = f'{self.path.parent.name}/{self.path.name}'
 
     def counts(self, total_docs: int) -> dict[str, int]:
         items: list[dict[str, object]] = self.data.get('items', [])  # type: ignore[assignment]
@@ -413,7 +415,15 @@ class CheckpointStore:
         self.path: Path = path
         self.data: dict[str, object] = {}
 
-    def load_or_init(self, collection_pid: str, safe_collection_pid: str, run_directory_name: str, listing: ListingStore, combined_path: Path, listing_path: Path) -> None:
+    def load_or_init(
+        self,
+        collection_pid: str,
+        safe_collection_pid: str,
+        run_directory_name: str,
+        listing: ListingStore,
+        combined_path: Path,
+        listing_path: Path,
+    ) -> None:
         existing: dict[str, object] | None = None
         if self.path.exists():
             try:
@@ -421,7 +431,11 @@ class CheckpointStore:
                     existing = json.load(fh)
             except Exception:
                 existing = None
-        created_at: str = existing.get('created_at') if isinstance(existing, dict) and isinstance(existing.get('created_at'), str) else _now_iso()
+        created_at: str = (
+            existing.get('created_at')
+            if isinstance(existing, dict) and isinstance(existing.get('created_at'), str)
+            else _now_iso()
+        )
         counts: dict[str, int] = listing.counts(total_docs=0)
         self.data = {
             'collection_pid': collection_pid,
@@ -432,14 +446,25 @@ class CheckpointStore:
             'completed': False,
             'counts': counts,
             'paths': {
-                'combined_text': f"{combined_path.parent.name}/{combined_path.name}",
-                'listing_json': f"{listing_path.parent.name}/{listing_path.name}",
+                'combined_text': f'{combined_path.parent.name}/{combined_path.name}',
+                'listing_json': f'{listing_path.parent.name}/{listing_path.name}',
             },
         }
         with self.path.open('w', encoding='utf-8') as fh:
             json.dump(self.data, fh, ensure_ascii=False, indent=2)
 
-    def save(self, collection_pid: str, safe_collection_pid: str, run_directory_name: str, listing: ListingStore, combined_path: Path, listing_path: Path, *, total_docs: int, completed: bool) -> None:
+    def save(
+        self,
+        collection_pid: str,
+        safe_collection_pid: str,
+        run_directory_name: str,
+        listing: ListingStore,
+        combined_path: Path,
+        listing_path: Path,
+        *,
+        total_docs: int,
+        completed: bool,
+    ) -> None:
         created_at: str = self.data.get('created_at') if isinstance(self.data.get('created_at'), str) else _now_iso()  # type: ignore[assignment]
         self.data['collection_pid'] = collection_pid
         self.data['safe_collection_pid'] = safe_collection_pid
@@ -449,8 +474,8 @@ class CheckpointStore:
         self.data['completed'] = completed
         self.data['counts'] = listing.counts(total_docs=total_docs)
         self.data['paths'] = {
-            'combined_text': f"{combined_path.parent.name}/{combined_path.name}",
-            'listing_json': f"{listing_path.parent.name}/{listing_path.name}",
+            'combined_text': f'{combined_path.parent.name}/{combined_path.name}',
+            'listing_json': f'{listing_path.parent.name}/{listing_path.name}',
         }
         with self.path.open('w', encoding='utf-8') as fh:
             json.dump(self.data, fh, ensure_ascii=False, indent=2)
@@ -486,7 +511,9 @@ class ExtractionProcessor:
     Handles per-pid processing using collaborators.
     """
 
-    def __init__(self, api: ApiClient, resolver: ItemTextResolver, urls: UrlBuilder, writer: CombinedTextWriter, listing: ListingStore) -> None:
+    def __init__(
+        self, api: ApiClient, resolver: ItemTextResolver, urls: UrlBuilder, writer: CombinedTextWriter, listing: ListingStore
+    ) -> None:
         self.api = api
         self.resolver = resolver
         self.urls = urls
@@ -603,13 +630,14 @@ class CLI:
             type=int,
             default=None,
             metavar='INTEGER',
-            help='Optional. Stop after this many extracted_texts have been successfully appended (useful for testing).'
+            help='Optional. Stop after this many extracted_texts have been successfully appended (useful for testing).',
         )
         return parser
 
     @staticmethod
     def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         return CLI.build_parser().parse_args(argv)
+
 
 def _now_iso() -> str:
     """
@@ -633,8 +661,6 @@ def _sleep(backoff_s: float) -> None:
     time.sleep(backoff_s)
 
 
-
-
 def main() -> int:
     """
     Fetches collection members, finds EXTRACTED_TEXT, writes combined text and JSON listing with resume support.
@@ -642,7 +668,7 @@ def main() -> int:
     args: argparse.Namespace = CLI.parse_args()
 
     collection_pid: str = args.collection_pid.strip()
-    safe_collection_pid: str = collection_pid.replace(":", "_")
+    safe_collection_pid: str = collection_pid.replace(':', '_')
     out_dir: Path = Path(args.output_dir).expanduser().resolve()
 
     run_mgr = RunDirectoryManager(out_dir, safe_collection_pid)
@@ -667,11 +693,11 @@ def main() -> int:
         effective_limit = max(0, args.test_limit - prior_appended)
 
     checkpoint = CheckpointStore(checkpoint_json_path)
-    checkpoint.load_or_init(collection_pid, safe_collection_pid, ts_dir.name, listing_store, combined_txt_path, listing_json_path)
+    checkpoint.load_or_init(
+        collection_pid, safe_collection_pid, ts_dir.name, listing_store, combined_txt_path, listing_json_path
+    )
 
-    headers: dict[str, str] = {
-        'user-agent': 'bdr-extracted-text-collector/1.0 (+https://repository.library.brown.edu/)'
-    }
+    headers: dict[str, str] = {'user-agent': 'bdr-extracted-text-collector/1.0 (+https://repository.library.brown.edu/)'}
     timeout: httpx.Timeout = httpx.Timeout(connect=30.0, read=60.0, write=60.0, pool=30.0)
     limits: httpx.Limits = httpx.Limits(max_keepalive_connections=10, max_connections=10)
     with httpx.Client(headers=headers, timeout=timeout, limits=limits) as client:
@@ -687,14 +713,32 @@ def main() -> int:
         listing_store.set_collection_info(collection_pid, coll_title)
 
         docs: list[dict[str, object]] = api.search_collection_pids(collection_pid)
-        checkpoint.save(collection_pid, safe_collection_pid, ts_dir.name, listing_store, combined_txt_path, listing_json_path, total_docs=len(docs), completed=False)
+        checkpoint.save(
+            collection_pid,
+            safe_collection_pid,
+            ts_dir.name,
+            listing_store,
+            combined_txt_path,
+            listing_json_path,
+            total_docs=len(docs),
+            completed=False,
+        )
         if not docs:
             print(f'No items found for collection {collection_pid}', file=sys.stderr)
 
         if effective_limit == 0:
             listing_store.update_summary(combined_txt_path)
             listing_store.save()
-            checkpoint.save(collection_pid, safe_collection_pid, ts_dir.name, listing_store, combined_txt_path, listing_json_path, total_docs=len(docs), completed=False)
+            checkpoint.save(
+                collection_pid,
+                safe_collection_pid,
+                ts_dir.name,
+                listing_store,
+                combined_txt_path,
+                listing_json_path,
+                total_docs=len(docs),
+                completed=False,
+            )
             print('Done. Appended text for 0 item(s). (Effective limit reached from prior run.)')
             print(f'Combined text: {combined_txt_path}')
             print(f'Listing JSON:  {listing_json_path}')
@@ -703,7 +747,7 @@ def main() -> int:
         appended_count: int = 0
         processed: set[str] = listing_store.processed_set()
         processor = ExtractionProcessor(api, resolver, urls, writer, listing_store)
-        for doc in tqdm(docs, total=len(docs), desc="Processing items"):
+        for doc in tqdm(docs, total=len(docs), desc='Processing items'):
             pid: object = doc.get('pid')
             if not isinstance(pid, str) or pid in processed:
                 continue
@@ -713,7 +757,16 @@ def main() -> int:
                     if effective_limit is not None and appended_count >= effective_limit:
                         listing_store.update_summary(combined_txt_path)
                         listing_store.save()
-                        checkpoint.save(collection_pid, safe_collection_pid, ts_dir.name, listing_store, combined_txt_path, listing_json_path, total_docs=len(docs), completed=False)
+                        checkpoint.save(
+                            collection_pid,
+                            safe_collection_pid,
+                            ts_dir.name,
+                            listing_store,
+                            combined_txt_path,
+                            listing_json_path,
+                            total_docs=len(docs),
+                            completed=False,
+                        )
                         break
             except Exception as exc:
                 listing_store.add_entry(
@@ -727,11 +780,29 @@ def main() -> int:
 
             listing_store.update_summary(combined_txt_path)
             listing_store.save()
-            checkpoint.save(collection_pid, safe_collection_pid, ts_dir.name, listing_store, combined_txt_path, listing_json_path, total_docs=len(docs), completed=False)
+            checkpoint.save(
+                collection_pid,
+                safe_collection_pid,
+                ts_dir.name,
+                listing_store,
+                combined_txt_path,
+                listing_json_path,
+                total_docs=len(docs),
+                completed=False,
+            )
 
         listing_store.update_summary(combined_txt_path)
         listing_store.save()
-        checkpoint.save(collection_pid, safe_collection_pid, ts_dir.name, listing_store, combined_txt_path, listing_json_path, total_docs=len(docs), completed=True)
+        checkpoint.save(
+            collection_pid,
+            safe_collection_pid,
+            ts_dir.name,
+            listing_store,
+            combined_txt_path,
+            listing_json_path,
+            total_docs=len(docs),
+            completed=True,
+        )
 
     print(f'Done. Appended text for {appended_count} item(s).')
     print(f'Combined text: {combined_txt_path}')
