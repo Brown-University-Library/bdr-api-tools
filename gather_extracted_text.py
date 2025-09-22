@@ -69,7 +69,10 @@ COLLECTION_URL_TPL = f'{BASE}/api/collections/{{pid}}/'
 
 class CollectionMetadata:
     """
-    Parses collection metadata values from collection JSON.
+    Summarizes how the class parses and derives display-ready collection metadata.
+    - Extracts customized title components from raw collection JSON.
+    - Prefers `name`/`title` fields; gracefully handles missing or variant keys.
+    - Inspects `ancestors` to append a provenance suffix like "-- (from Parent)".
     """
 
     @staticmethod
@@ -102,7 +105,11 @@ class CollectionMetadata:
 
 class UrlBuilder:
     """
-    Builds canonical URLs used throughout the tool.
+    Centralizes construction of canonical URLs used across the workflow.
+    - Holds a configurable `base` host to support testing and overrides.
+    - Builds item API endpoints for fetching item JSON.
+    - Builds Studio-facing item URLs for human navigation.
+    - Builds storage URLs for the EXTRACTED_TEXT datastream.
     """
 
     def __init__(self, base: str = BASE) -> None:
@@ -120,7 +127,13 @@ class UrlBuilder:
 
 class ItemTextResolver:
     """
-    Finds EXTRACTED_TEXT links and sizes from item JSON, including child handling helpers.
+    Determines where an item's EXTRACTED_TEXT can be retrieved from.
+    - Parses item JSON to locate link and size information for EXTRACTED_TEXT.
+    - Examines `links.content_datastreams`, then `links.datastreams`, then `datastreams`.
+    - Constructs a storage URL fallback when only `datastreams` is present.
+    - Extracts and normalizes sizes that may be provided as int or str.
+    - Enumerates child PIDs via `relations.hasPart` to support cascading checks.
+    - Returns structured results for downstream network retrieval.
     """
 
     def __init__(self, storage_url_tpl: str = STORAGE_URL_TPL) -> None:
@@ -187,7 +200,13 @@ class ItemTextResolver:
 
 class ApiClient:
     """
-    Encapsulates httpx interactions and retry/backoff policies.
+    Encapsulates HTTP interactions with retries, backoff, and streaming.
+    - Implements exponential backoff and small pre-flight sleeps.
+    - Treats 5xx responses as retryable server errors.
+    - Builds JSON fetch-url callers for items and collections, with retries.
+    - Streams text responses efficiently for large EXTRACTED_TEXT payloads.
+    - Follows redirects and applies timeouts suitable for repository APIs.
+    - Raises last encountered exception after exhausting retry budget.
     """
 
     def __init__(self, client: httpx.Client) -> None:
@@ -264,7 +283,13 @@ class ApiClient:
 
 class RunDirectoryManager:
     """
-    Manages run directory naming, prior-run detection, path creation, and copy-forward.
+    Manages timestamped run directories and resume-friendly filesystem state.
+    - Generates deterministic run directory names tied to collection PID and time.
+    - Detects latest prior run that is resumable based on checkpoint presence.
+    - Creates current run directory with required parent structure.
+    - Copies forward prior combined text and listing outputs when resuming.
+    - Provides typed accessors for combined, listing, and checkpoint paths.
+    - Guards operations with assertions to prevent misuse before initialization.
     """
 
     def __init__(self, out_dir: Path, safe_collection_pid: str) -> None:
@@ -331,7 +356,13 @@ class RunDirectoryManager:
 
 class ListingStore:
     """
-    Owns listing JSON data and I/O; provides helper methods.
+    Manages listing JSON state, persistence, and convenience helpers.
+    - Loads existing listing JSON or initializes an empty, typed structure.
+    - Appends new entries or updates existing per-item entries with derived human-readable sizes.
+    - Computes counts used for progress reporting and checkpoint metadata.
+    - Updates summary fields including timestamps and relative output paths.
+    - Provides a processed PID set to support idempotent processing.
+    - Stores only serializable data compatible with JSON dump/load.
     """
 
     def __init__(self, path: Path) -> None:
@@ -417,7 +448,15 @@ class ListingStore:
 
 class CheckpointStore:
     """
-    Manages checkpoint JSON lifecycle and counts.
+    Tracks run progress and output paths in a resumable checkpoint file.
+    - Initializes a checkpoint while preserving original creation time.
+    - Persists updated counts, paths, and completion status after each step.
+    - Stores total document counts for accurate progress reporting.
+    - Provides a single place to mark a run as completed.
+    - Writes human-auditable JSON with stable key ordering and indentation.
+    - Tolerates corrupt or missing prior data by reinitializing safely.
+    - Avoids domain logic; focuses on recording state for resumption.
+    - Keeps file I/O localized to the checkpoint path provided.
     """
 
     def __init__(self, path: Path) -> None:
@@ -498,7 +537,14 @@ class CheckpointStore:
 
 class CombinedTextWriter:
     """
-    Owns the combined text file and append operations.
+    Manages the aggregated EXTRACTED_TEXT output file and appends.
+    - Ensures the combined text file exists on first use.
+    - Appends item text with a clear, parseable PID delimiter prefix.
+    - Normalizes trailing newlines to keep file structure consistent.
+    - Provides minimal responsibilities limited to text file operations.
+    - Avoids encoding surprises by writing UTF-8 explicitly.
+    - Does not attempt deduplication; relies on higher-level idempotency.
+    - Keeps writes incremental to support large collections efficiently.
     """
 
     def __init__(self, path: Path) -> None:
@@ -517,7 +563,15 @@ class CombinedTextWriter:
 
 class ExtractionProcessor:
     """
-    Handles per-pid processing using collaborators.
+    Coordinates per-PID processing using injected objects (eg ApiClient, ItemTextResolver, etc).
+    - Fetches item JSON and derives display fields like title and URLs.
+    - Resolves EXTRACTED_TEXT link/size and streams content when available.
+    - Appends combined text and updates listing entries on success.
+    - Handles 403 Forbidden responses by recording status without text.
+    - Traverses child items via `hasPart` when parent lacks text.
+    - Records parent status when handled via child EXTRACTED_TEXT.
+    - Adds explicit no-text entries when neither parent nor children qualify.
+    - Returns boolean indicating whether any text was appended.
     """
 
     def __init__(
@@ -626,7 +680,16 @@ class ExtractionProcessor:
 
 class CLI:
     """
-    Encapsulates CLI building and parsing.
+    Manages command-line parsing for the script entrypoint.
+    - Builds an argparse parser with required and optional arguments.
+    - Accepts a collection PID identifying the target collection.
+    - Accepts an output directory for run artifacts and results.
+    - Accepts an optional test-limit to bound successful appends.
+    - Exposes a parse helper to support testing with custom argv.
+    - Keeps CLI concerns separate from runtime orchestration.
+    - Provides helpful descriptions and usage-hints.
+    - Returns an argparse.Namespace (simple attribute container)
+      with values cast to their types, ready for main() -- (like `args.collection_pid`).
     """
 
     @staticmethod
