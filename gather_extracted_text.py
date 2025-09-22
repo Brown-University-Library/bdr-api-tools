@@ -80,11 +80,11 @@ class CollectionMetadata:
         """
         Prepares a customized collection-title from a collection's item-api JSON.
 
-        Uses the collection's `name` and, when available, the last ancestor's name/title
-        to append a source in the form " -- (from {parent})".
+        - Prefers `name` and appends "-- (from {parent})" using the last ancestor when present.
+        - Handles missing keys and variant shapes in `ancestors` (list[str] | list[dict]).
+        - Returns a plain `name` string when no parent information is available.
 
-        The reason is because lots of collections make be named "Theses and Dissertations",
-        and I want users to be able to see at a glance which collection they're a part of.
+        Called by `main()`
         """
         coll_name: str = coll_json.get('name') or ''  # type: ignore[assignment]
         parent_name: str = ''
@@ -116,12 +116,33 @@ class UrlBuilder:
         self.base: str = base
 
     def item_api_url(self, pid: str) -> str:
+        """
+        - Builds the item API URL used to fetch item JSON for a PID.
+        - Uses the canonical item URL template to ensure consistency.
+        - Keeps URL construction centralized for easier testing/overrides.
+
+        Called by `ExtractionProcessor.process_pid()`, `main()`
+        """
         return ITEM_URL_TPL.format(pid=pid)
 
     def studio_url(self, pid: str) -> str:
+        """
+        - Builds a human-facing Studio URL for quick navigation to an item.
+        - Uses configured `base` to support alternate environments.
+        - Keeps derivation logic centralized for easier testing/overrides.
+
+        Called by `ExtractionProcessor.process_pid()`, `main()`
+        """
         return f'{self.base}/studio/item/{pid}/'
 
     def storage_text_url(self, pid: str) -> str:
+        """
+        - Builds the storage URL for the EXTRACTED_TEXT datastream.
+        - Provides a fallback when only `datastreams` metadata is available.
+        - Ensures predictable path composition via template.
+
+        Called by `ItemTextResolver.find_link_and_size()`
+        """
         return STORAGE_URL_TPL.format(pid=pid)
 
 
@@ -141,7 +162,11 @@ class ItemTextResolver:
 
     def extract_child_pids(self, item_json: dict[str, object]) -> list[str]:
         """
-        Extracts child pids from relations.hasPart, supporting list[str] or list[dict].
+        - Parses `relations.hasPart` to normalize child PID values.
+        - Supports shapes like list[str] or list[dict{pid|id}].
+        - Returns an ordered list of child PIDs for downstream checks.
+
+        Called by `ExtractionProcessor.process_pid()`
         """
         rels: dict[str, object] = item_json.get('relations', {})  # type: ignore[assignment]
         has_part: list[object] = rels.get('hasPart', [])  # type: ignore[assignment]
@@ -157,7 +182,11 @@ class ItemTextResolver:
 
     def extract_size_from_datastreams(self, item_json: dict[str, object]) -> int | None:
         """
-        Extracts EXTRACTED_TEXT size from datastreams block if present.
+        - Inspects `datastreams.EXTRACTED_TEXT.size` for int or numeric str.
+        - Normalizes to an int when possible; otherwise returns None.
+        - Avoids network requests by relying on metadata only.
+
+        Called by `ItemTextResolver.find_link_and_size()`
         """
         ds_block: dict[str, object] = item_json.get('datastreams', {}) or {}  # type: ignore[assignment]
         entry: object = ds_block.get('EXTRACTED_TEXT')
@@ -171,8 +200,11 @@ class ItemTextResolver:
 
     def find_link_and_size(self, item_json: dict[str, object], pid: str) -> tuple[str, int | None] | None:
         """
-        Locates EXTRACTED_TEXT download URL and size if available.
-        Checks links.content_datastreams, then links.datastreams, then datastreams size + constructs URL.
+        - Locates an EXTRACTED_TEXT URL via `links.content_datastreams` or `links.datastreams`.
+        - Falls back to storage URL when only `datastreams.EXTRACTED_TEXT` exists.
+        - Returns a (url, size|None) tuple or None if no candidate is found.
+
+        Called by `ExtractionProcessor.process_pid()`
         """
         links: dict[str, object] = item_json.get('links', {})  # type: ignore[assignment]
         content_ds: dict[str, object] = links.get('content_datastreams', {}) or {}  # type: ignore[assignment]
@@ -213,6 +245,13 @@ class ApiClient:
         self.client: httpx.Client = client
 
     def get_with_retries(self, url: str, *, max_tries: int = 4, timeout_s: float = 30.0) -> httpx.Response:
+        """
+        - Performs a GET request with small pre-flight sleep and exponential backoff.
+        - Treats 5xx responses as retryable; returns first successful response.
+        - Raises the last encountered exception after retry budget is exhausted.
+
+        Called by `ApiClient.search_collection_pids()`, `ApiClient.fetch_item_json()`, `ApiClient.fetch_collection_json()`
+        """
         last_exc: Exception | None = None
         for attempt in range(1, max_tries + 1):
             try:
@@ -228,6 +267,13 @@ class ApiClient:
         raise last_exc
 
     def stream_text_with_retries(self, url: str, *, max_tries: int = 4, timeout_s: float = 60.0) -> str:
+        """
+        - Streams a text payload with retries and backoff suitable for large files.
+        - Concatenates non-empty chunks and returns the full text body.
+        - Follows redirects and propagates status errors except handled 403s upstream.
+
+        Called by `ExtractionProcessor.process_pid()`
+        """
         last_exc: Exception | None = None
         for attempt in range(1, max_tries + 1):
             try:
@@ -246,6 +292,13 @@ class ApiClient:
         raise last_exc
 
     def search_collection_pids(self, collection_pid: str) -> list[dict[str, object]]:
+        """
+        - Pages through Solr-backed search API to collect member item docs.
+        - Constructs `fq`/`fl` and iterates with `rows`/`start` until complete.
+        - Returns a list of dicts containing at least `pid` and `primary_title`.
+
+        Called by `main()`
+        """
         rows: int = 500
         start: int = 0
         docs: list[dict[str, object]] = []
@@ -268,6 +321,13 @@ class ApiClient:
         return docs
 
     def fetch_item_json(self, pid: str) -> dict[str, object]:
+        """
+        - Retrieves item JSON via the item API endpoint.
+        - Raises for non-2xx responses and returns parsed JSON.
+        - Centralizes request execution for consistent headers/timeouts.
+
+        Called by `ExtractionProcessor.process_pid()`
+        """
         url: str = ITEM_URL_TPL.format(pid=pid)
         log.debug(f'trying item url, ``{url}``')
         resp: httpx.Response = self.get_with_retries(url)
@@ -275,6 +335,13 @@ class ApiClient:
         return resp.json()
 
     def fetch_collection_json(self, pid: str) -> dict[str, object]:
+        """
+        - Retrieves collection JSON via the collections API endpoint.
+        - Raises for non-2xx responses and returns parsed JSON.
+        - Centralizes request execution for consistent headers/timeouts.
+
+        Called by `main()`
+        """
         url: str = COLLECTION_URL_TPL.format(pid=pid)
         resp: httpx.Response = self.get_with_retries(url)
         resp.raise_for_status()
@@ -298,9 +365,23 @@ class RunDirectoryManager:
         self.run_dir: Path | None = None
 
     def run_dir_name_for(self) -> str:
+        """
+        - Composes a timestamped run directory name incorporating the collection.
+        - Uses a compact, filesystem-safe local timestamp for ordering.
+        - Keeps naming logic deterministic to simplify resume discovery.
+
+        Called by `RunDirectoryManager.create_run_dir()`
+        """
         return f'run-{_now_compact_local()}-{self.safe_collection_pid}'
 
     def create_run_dir(self) -> Path:
+        """
+        - Creates the current run directory under the configured output base.
+        - Stores the resulting Path for subsequent path helper methods.
+        - Ensures parent directories exist.
+
+        Called by `main()`
+        """
         name: str = self.run_dir_name_for()
         p: Path = self.out_dir / name
         p.mkdir(parents=True, exist_ok=True)
@@ -308,10 +389,24 @@ class RunDirectoryManager:
         return p
 
     def _is_run_dir_for(self, path: Path) -> bool:
+        """
+        - Checks if a directory name matches the naming pattern for this collection.
+        - Requires both the `run-` prefix and the safe collection PID suffix.
+        - Ensures the path is a directory.
+
+        Called by `RunDirectoryManager.find_latest_prior_run_dir()`
+        """
         name: str = path.name
         return name.startswith('run-') and name.endswith(f'-{self.safe_collection_pid}') and path.is_dir()
 
     def find_latest_prior_run_dir(self) -> Path | None:
+        """
+        - Scans output base for prior run directories matching this collection.
+        - Prefers the most recent run that has an uncompleted checkpoint and a listing.
+        - Returns the Path to resume from, or None if not resumable.
+
+        Called by `main()`
+        """
         candidates: list[Path] = [p for p in self.out_dir.iterdir() if self._is_run_dir_for(p)]
         if not candidates:
             return None
@@ -331,6 +426,13 @@ class RunDirectoryManager:
         return None
 
     def copy_prior_outputs(self, prior_dir: Path) -> None:
+        """
+        - Copies listing and combined text files from a prior run into the new run.
+        - Preserves filenames to keep downstream relative path references stable.
+        - Skips copies if inputs do not exist.
+
+        Called by `main()`
+        """
         assert self.run_dir is not None
         prior_combined: Path = prior_dir / f'extracted_text_for_collection_pid-{self.safe_collection_pid}.txt'
         prior_listing: Path = prior_dir / f'listing_for_collection_pid-{self.safe_collection_pid}.json'
@@ -342,14 +444,35 @@ class RunDirectoryManager:
             shutil.copy2(prior_listing, new_listing)
 
     def combined_text_path(self) -> Path:
+        """
+        - Builds the combined text output path for this run.
+        - Requires `create_run_dir()` to have been called.
+        - Keeps path construction centralized.
+
+        Called by `main()`, `ListingStore.update_summary()`, `CheckpointStore.save()`
+        """
         assert self.run_dir is not None
         return self.run_dir / f'extracted_text_for_collection_pid-{self.safe_collection_pid}.txt'
 
     def listing_path(self) -> Path:
+        """
+        - Builds the listing JSON output path for this run.
+        - Requires `create_run_dir()` to have been called.
+        - Keeps path construction centralized.
+
+        Called by `main()`, `CheckpointStore.save()`
+        """
         assert self.run_dir is not None
         return self.run_dir / f'listing_for_collection_pid-{self.safe_collection_pid}.json'
 
     def checkpoint_path(self) -> Path:
+        """
+        - Builds the checkpoint JSON output path for this run.
+        - Requires `create_run_dir()` to have been called.
+        - Keeps path construction centralized.
+
+        Called by `main()`
+        """
         assert self.run_dir is not None
         return self.run_dir / f'checkpoint_for_collection_pid-{self.safe_collection_pid}.json'
 
@@ -370,6 +493,13 @@ class ListingStore:
         self.data: dict[str, object] = {}
 
     def load_or_init(self) -> None:
+        """
+        - Loads existing listing JSON if present; otherwise initializes structure.
+        - Populates a `summary` section and an empty `items` list on first run.
+        - Keeps in-memory `data` synchronized with the file on disk.
+
+        Called by `main()`
+        """
         if self.path.exists():
             with self.path.open('r', encoding='utf-8') as fh:
                 self.data = json.load(fh)
@@ -388,11 +518,25 @@ class ListingStore:
         }
 
     def save(self) -> None:
+        """
+        - Updates the listing `summary.timestamp` and persists JSON to disk.
+        - Writes UTF-8 with stable formatting for readability.
+        - Keeps only serializable structures.
+
+        Called by `main()`
+        """
         self.data['summary']['timestamp'] = _now_iso()
         with self.path.open('w', encoding='utf-8') as fh:
             json.dump(self.data, fh, ensure_ascii=False, indent=2)
 
     def add_entry(self, *, item_pid: str, primary_title: str, item_api_url: str, studio_url: str, size: int | None) -> None:
+        """
+        - Inserts or updates an item entry with title, URLs, and human-readable size.
+        - Replaces existing entry when `item_pid` already exists in listing.
+        - Defer counts/summary aggregation to `update_summary()`.
+
+        Called by `ExtractionProcessor.process_pid()`, `main()`
+        """
         items: list[dict[str, object]] = self.data.setdefault('items', [])  # type: ignore[assignment]
         idx: int | None = next((i for i, d in enumerate(items) if d.get('item_pid') == item_pid), None)
         human_size: str | None = humanize.naturalsize(size) if isinstance(size, int) else None
@@ -409,6 +553,13 @@ class ListingStore:
             items[idx] = entry
 
     def processed_set(self) -> set[str]:
+        """
+        - Builds a set of PIDs present in the listing `items` array.
+        - Uses only valid string `item_pid` values.
+        - Supports idempotent runs by allowing quick membership checks.
+
+        Called by `main()`
+        """
         done: set[str] = set()
         for item in self.data.get('items', []):
             pid: object = item.get('item_pid')  # type: ignore[index]
@@ -417,6 +568,13 @@ class ListingStore:
         return done
 
     def update_summary(self, combined_path: Path) -> None:
+        """
+        - Recomputes counts and total size for reporting.
+        - Stores relative paths to combined text and listing JSON.
+        - Refreshes the `summary.timestamp`.
+
+        Called by `main()`
+        """
         count: int = sum(1 for d in self.data.get('items', []) if d.get('extracted_text_file_size'))
         size: int = combined_path.stat().st_size if combined_path.exists() else 0
         self.data['summary'].pop('all_extracted_text_file_size_bytes', None)
@@ -428,6 +586,13 @@ class ListingStore:
         self.data['summary']['listing_path'] = f'{self.path.parent.name}/{self.path.name}'
 
     def counts(self, total_docs: int) -> dict[str, int]:
+        """
+        - Computes processed/appended/no-text/forbidden counts.
+        - Accepts the `total_docs` to include in returned structure.
+        - Returns a dict of simple integer fields for checkpointing.
+
+        Called by `CheckpointStore.load_or_init()`, `CheckpointStore.save()`, `main()`
+        """
         items: list[dict[str, object]] = self.data.get('items', [])  # type: ignore[assignment]
         processed_count: int = len({d.get('item_pid') for d in items if isinstance(d.get('item_pid'), str)})
         appended_count: int = sum(1 for d in items if d.get('extracted_text_file_size'))
@@ -442,6 +607,13 @@ class ListingStore:
         }
 
     def set_collection_info(self, collection_pid: str, collection_title: str) -> None:
+        """
+        - Stores collection PID and a displayable collection title in `summary`.
+        - Allows an empty title when metadata lookup fails.
+        - Keeps fields used in output headers stable.
+
+        Called by `main()`
+        """
         self.data['summary']['collection_pid'] = collection_pid
         self.data['summary']['collection_primary_title'] = collection_title
 
@@ -472,6 +644,13 @@ class CheckpointStore:
         combined_path: Path,
         listing_path: Path,
     ) -> None:
+        """
+        - Initializes a checkpoint file, preserving original `created_at` if present.
+        - Seeds counts using the current listing and stores relative output paths.
+        - Writes JSON immediately so a resumable state exists from the start.
+
+        Called by `main()`
+        """
         existing: dict[str, object] | None = None
         if self.path.exists():
             try:
@@ -513,6 +692,13 @@ class CheckpointStore:
         total_docs: int,
         completed: bool,
     ) -> None:
+        """
+        - Persists updated counts, paths, and completion status to the checkpoint.
+        - Preserves `created_at` while refreshing `updated_at`.
+        - Accepts `total_docs` to provide accurate progress context.
+
+        Called by `main()`
+        """
         created_at: str = self.data.get('created_at') if isinstance(self.data.get('created_at'), str) else _now_iso()  # type: ignore[assignment]
         self.data['collection_pid'] = collection_pid
         self.data['safe_collection_pid'] = safe_collection_pid
@@ -529,6 +715,13 @@ class CheckpointStore:
             json.dump(self.data, fh, ensure_ascii=False, indent=2)
 
     def mark_completed(self) -> None:
+        """
+        - Marks the checkpoint as completed and persists immediately.
+        - Updates `updated_at` timestamp.
+        - Keeps file contents human-readable.
+
+        Called by `(unused in current flow)`
+        """
         self.data['completed'] = True
         self.data['updated_at'] = _now_iso()
         with self.path.open('w', encoding='utf-8') as fh:
@@ -551,9 +744,23 @@ class CombinedTextWriter:
         self.path: Path = path
 
     def ensure_file(self) -> None:
+        """
+        - Creates the combined text file if it does not already exist.
+        - Ensures subsequent appends always succeed.
+        - Keeps file encoding UTF-8.
+
+        Called by `main()`
+        """
         self.path.touch(exist_ok=True)
 
     def append(self, pid: str, text: str) -> None:
+        """
+        - Appends item text with a PID delimiter prefix and trailing newline.
+        - Strips extra trailing newlines from input to keep a consistent shape.
+        - Writes incrementally for large-run efficiency.
+
+        Called by `ExtractionProcessor.process_pid()`
+        """
         prefix = f'---|||start-of-pid:{pid}|||---\n'
         with self.path.open('a', encoding='utf-8') as fh:
             fh.write(prefix)
@@ -564,14 +771,9 @@ class CombinedTextWriter:
 class ExtractionProcessor:
     """
     Coordinates per-PID processing using injected objects (eg ApiClient, ItemTextResolver, etc).
-    - Fetches item JSON and derives display fields like title and URLs.
-    - Resolves EXTRACTED_TEXT link/size and streams content when available.
-    - Appends combined text and updates listing entries on success.
-    - Handles 403 Forbidden responses by recording status without text.
-    - Traverses child items via `hasPart` when parent lacks text.
-    - Records parent status when handled via child EXTRACTED_TEXT.
-    - Adds explicit no-text entries when neither parent nor children qualify.
-    - Returns boolean indicating whether any text was appended.
+    - Fetches item metadata and resolves a viable EXTRACTED_TEXT URL and size.
+    - Streams text and appends to the combined file; records listing entry.
+    - Traverse child PIDs when the parent lacks text; record statuses accordingly.
     """
 
     def __init__(
@@ -584,6 +786,13 @@ class ExtractionProcessor:
         self.listing = listing
 
     def process_pid(self, pid: str) -> bool:
+        """
+        - Fetches item metadata and resolves a viable EXTRACTED_TEXT URL and size.
+        - Streams text and appends to the combined file; records listing entry.
+        - Traverses child PIDs when the parent lacks text; records statuses accordingly.
+
+        Called by `main()`
+        """
         item_json: dict[str, object] = self.api.fetch_item_json(pid)
         primary_title: str = item_json.get('primary_title') or item_json.get('mods_title_full_primary_tsi') or ''  # type: ignore[assignment]
         studio_url: str = item_json.get('uri') or self.urls.studio_url(pid)  # type: ignore[assignment]
@@ -694,6 +903,13 @@ class CLI:
 
     @staticmethod
     def build_parser() -> argparse.ArgumentParser:
+        """
+        - Builds an `argparse.ArgumentParser` with required/optional flags.
+        - Accepts collection PID, output directory, and an optional test limit.
+        - Returns a ready-to-use parser for `parse_args()`.
+
+        Called by `CLI.parse_args()`, `main()`
+        """
         parser = argparse.ArgumentParser(description='Collect EXTRACTED_TEXT for a collection.')
         parser.add_argument('--collection-pid', required=True, help='Collection PID like bdr:c9fzffs9')
         parser.add_argument('--output-dir', required=True, help='Directory to write outputs')
@@ -708,12 +924,21 @@ class CLI:
 
     @staticmethod
     def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+        """
+        - Parses CLI arguments from `argv` (or `sys.argv` when None).
+        - Returns a simple namespace with typed attributes.
+        - Delegates parser construction to `build_parser()`.
+
+        Called by `main()`
+        """
         return CLI.build_parser().parse_args(argv)
 
 
 def _now_iso() -> str:
     """
     Returns an ISO-8601 local timestamp with timezone info.
+
+    Called by `ListingStore.load_or_init()`, `ListingStore.save()`, `CheckpointStore.load_or_init()`, `CheckpointStore.save()`, `CheckpointStore.mark_completed()`
     """
     return datetime.now().astimezone().isoformat()
 
@@ -722,6 +947,8 @@ def _now_compact_local() -> str:
     """
     Returns a filesystem-safe local timestamp like YYYYmmddTHHMMSS-0500
     (offset varies by local timezone). Useful for naming directories.
+
+    Called by `main()`, `ListingStore.load_or_init()`, `ListingStore.save()`, `CheckpointStore.load_or_init()`, `CheckpointStore.save()`, `CheckpointStore.mark_completed()`
     """
     return datetime.now().astimezone().strftime('%Y%m%dT%H%M%S%z')
 
@@ -729,6 +956,8 @@ def _now_compact_local() -> str:
 def _sleep(backoff_s: float) -> None:
     """
     Sleeps for given seconds; centralizes sleep for easier tweaking.
+
+    Called by `ApiClient.get_with_retries()`, `ApiClient.stream_text_with_retries()`
     """
     time.sleep(backoff_s)
 
@@ -815,7 +1044,7 @@ def main() -> int:
             coll_title = ''
         listing_store.set_collection_info(collection_pid, coll_title)
 
-        ## search for member item PIDs and save initial checkpoint --
+        ## search for member item PIDs and save initial checkpoint -----
         docs: list[dict[str, object]] = api.search_collection_pids(collection_pid)
         checkpoint.save(
             collection_pid,
