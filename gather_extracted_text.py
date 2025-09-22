@@ -22,9 +22,7 @@ Args:
   --test-limit (optional) -- convenient for testing
 
 TODO:
-- I just refactored 30 top-level functions into classes.
-- I want to add docstrings to the classes and functions -- and lots of comments to the main() function --
-  to make the code easier to follow.
+- Review docstrings for style and accuracy.
 """
 
 import argparse
