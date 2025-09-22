@@ -695,6 +695,8 @@ def main() -> int:
     - After each item, updates listing summary and saves checkpoint.
     - If test limit is reached, persists summary and checkpoint, then stops.
     - At end, updates summary, saves listing, and marks checkpoint completed.
+
+    Called by: dundermain
     """
     ## handle args --------------------------------------------------
     args: argparse.Namespace = CLI.parse_args()
