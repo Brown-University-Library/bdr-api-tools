@@ -673,39 +673,67 @@ def _sleep(backoff_s: float) -> None:
 def main() -> int:
     """
     Fetches collection members, finds EXTRACTED_TEXT, writes combined text and JSON listing with resume support.
-    """
-    args: argparse.Namespace = CLI.parse_args()
 
+    Flow:
+    - Parses CLI args: collection PID, output dir, optional test limit.
+    - Creates a timestamped run directory; copies prior outputs if resumable.
+    - Computes paths for combined text, listing JSON, and checkpoint JSON.
+    - Loads or initializes listing JSON; ensures combined text file exists.
+    - Computes effective test limit minus any prior appended count.
+    - Initializes checkpoint with run metadata, counts, and output paths.
+    - Creates an httpx client with headers, timeouts, and connection limits.
+    - Fetches collection JSON; derives a display title; stores in listing summary.
+    - Searches for member item PIDs; saves checkpoint with total docs.
+    - If effective limit is 0, updates summary, saves, checkpoints, and exits.
+    - Builds processed-set from listing to skip already handled PIDs.
+    - For each PID, processes unless already processed; catches and records errors.
+    - Tries item’s EXTRACTED_TEXT; on success, appends text and records size.
+    - On 403, records item as forbidden; skips appending text.
+    - If no text, inspects children via hasPart; tries child EXTRACTED_TEXT.
+    - When handled via child, appends child text and records parent status.
+    - If neither item nor children have text, records item with no size.
+    - After each item, updates listing summary and saves checkpoint.
+    - If test limit is reached, persists summary and checkpoint, then stops.
+    - At end, updates summary, saves listing, and marks checkpoint completed.
+    """
+    ## handle args --------------------------------------------------
+    args: argparse.Namespace = CLI.parse_args()
     collection_pid: str = args.collection_pid.strip()
     safe_collection_pid: str = collection_pid.replace(':', '_')
     out_dir: Path = Path(args.output_dir).expanduser().resolve()
 
+    ## create run directory (resume-safe) ---------------------------
     run_mgr = RunDirectoryManager(out_dir, safe_collection_pid)
     prior_dir: Path | None = run_mgr.find_latest_prior_run_dir()
     ts_dir: Path = run_mgr.create_run_dir()
     if prior_dir is not None:
         run_mgr.copy_prior_outputs(prior_dir)
 
+    ## compute output paths -----------------------------------------
     combined_txt_path: Path = run_mgr.combined_text_path()
     listing_json_path: Path = run_mgr.listing_path()
     checkpoint_json_path: Path = run_mgr.checkpoint_path()
 
+    ## init listing store and ensure combined text file -------------
     listing_store = ListingStore(listing_json_path)
     listing_store.load_or_init()
 
     writer = CombinedTextWriter(combined_txt_path)
     writer.ensure_file()
 
+    ## compute effective test limit ---------------------------------
     effective_limit: int | None = None
     if args.test_limit is not None:
         prior_appended: int = listing_store.counts(total_docs=0)['appended_count']
         effective_limit = max(0, args.test_limit - prior_appended)
 
+    ## initialize checkpoint -----------------------------------------
     checkpoint = CheckpointStore(checkpoint_json_path)
     checkpoint.load_or_init(
         collection_pid, safe_collection_pid, ts_dir.name, listing_store, combined_txt_path, listing_json_path
     )
 
+    ## create httpx client (headers, timeouts, limits) --------------
     headers: dict[str, str] = {'user-agent': 'bdr-extracted-text-collector/1.0 (+https://repository.library.brown.edu/)'}
     timeout: httpx.Timeout = httpx.Timeout(connect=30.0, read=60.0, write=60.0, pool=30.0)
     limits: httpx.Limits = httpx.Limits(max_keepalive_connections=10, max_connections=10)
@@ -714,6 +742,7 @@ def main() -> int:
         resolver = ItemTextResolver()
         urls = UrlBuilder(BASE)
 
+        ## fetch collection metadata and set listing summary --------
         try:
             coll_json: dict[str, object] = api.fetch_collection_json(collection_pid)
             coll_title: str = CollectionMetadata.title_from_json(coll_json)
@@ -721,6 +750,7 @@ def main() -> int:
             coll_title = ''
         listing_store.set_collection_info(collection_pid, coll_title)
 
+        ## search for member item PIDs and save initial checkpoint --
         docs: list[dict[str, object]] = api.search_collection_pids(collection_pid)
         checkpoint.save(
             collection_pid,
@@ -735,6 +765,7 @@ def main() -> int:
         if not docs:
             print(f'No items found for collection {collection_pid}', file=sys.stderr)
 
+        ## early exit if effective limit is 0 -----------------------
         if effective_limit == 0:
             listing_store.update_summary(combined_txt_path)
             listing_store.save()
@@ -753,6 +784,7 @@ def main() -> int:
             print(f'Listing JSON:  {listing_json_path}')
             return 0
 
+        ## build processed set and processor ------------------------
         appended_count: int = 0
         processed: set[str] = listing_store.processed_set()
         processor = ExtractionProcessor(api, resolver, urls, writer, listing_store)
@@ -764,6 +796,7 @@ def main() -> int:
                 if processor.process_pid(pid):
                     appended_count += 1
                     if effective_limit is not None and appended_count >= effective_limit:
+                        ## persist summary and checkpoint when test limit reached -----
                         listing_store.update_summary(combined_txt_path)
                         listing_store.save()
                         checkpoint.save(
@@ -787,6 +820,7 @@ def main() -> int:
                 )
                 print(f'Error processing {pid}: {exc}', file=sys.stderr)
 
+            ## after each item: update listing summary and checkpoint -----
             listing_store.update_summary(combined_txt_path)
             listing_store.save()
             checkpoint.save(
@@ -800,6 +834,7 @@ def main() -> int:
                 completed=False,
             )
 
+        ## end-of-run: update summary, save listing, mark checkpoint completed -----
         listing_store.update_summary(combined_txt_path)
         listing_store.save()
         checkpoint.save(
@@ -813,10 +848,13 @@ def main() -> int:
             completed=True,
         )
 
+    ## wrap up output -----------------------------------------------
     print(f'Done. Appended text for {appended_count} item(s).')
     print(f'Combined text: {combined_txt_path}')
     print(f'Listing JSON:  {listing_json_path}')
     return 0
+
+    ## end def main()
 
 
 if __name__ == '__main__':
