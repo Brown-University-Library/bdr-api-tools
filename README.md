@@ -1,4 +1,4 @@
-See [index.md](index.md). for more info.
+See [index.md](index.md) for more info; that's used for the auto-generated github.io [landing page]((https://brown-university-library.github.io/bdr-api-tools/)).
 
 Additional notes:
 - The inline-metadata at the top of each script allows `uv` to run the script without a local installation of python or virtual-environments or dependency-packages.
