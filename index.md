@@ -25,20 +25,20 @@ For Brown community members, a recommendation: if you're off-campus, enable [Bro
 
 ### calc_collection_size.py (brief)
 
-Calculates the total storage size of all items in the given BDR collection. It queries the Search API with pagination to retrieve and process the necessary data, and prints a summary including a human-readable size. It separately fetches the collection title via the Collections API. 
+Calculates the total storage size of all items in the given BDR collection. It queries the Search API with pagination to retrieve and process the necessary data, and prints a summary including a human-readable size. It gets the collection title via the Collections API. 
 
 ---
 
 
 ### gather_extracted_text.py (brief)
 
-Collects EXTRACTED_TEXT across all items (parent & child) in a collection, writing a single combined text file and a detailed listing JSON. It saves progress to support interruptions and resuming without overloading the server, and offers an optional --test-limit flag for testing convenience. 
+Collects EXTRACTED_TEXT across all items (parent & child) in a collection, writing a single combined text file and a detailed listing JSON. It saves progress to resume elegantly if interruptions occur, and offers an optional --test-limit flag for testing convenience. 
 
 ---
 
 ### show_zip_info.py (brief)
 
-Fetches data from the item-api and summarizes zip-file contents for the givenitem -- AND zip-file contents for all child-items. It computes per-item and aggregate-summary filetype counts based on extension, and outputs a structured JSON with _meta_ and item_info.
+Assembles data from the item-api and summarizes zip-file contents for the given item -- AND zip-file contents for all child-items. It computes per-item and aggregate-summary filetype counts based on extension, and outputs a structured JSON with _meta_ and item_info.
 
 ---
 ---
@@ -49,7 +49,7 @@ Fetches data from the item-api and summarizes zip-file contents for the givenite
 
 ### calc_collection_size.py (detailed)
 
-Calculates the total storage size of all items in the given BDR collection. It queries the Search API with pagination to retrieve and process the necessary data, and prints a summary including a human-readable size. It separately fetches the collection title via the Collections API. 
+Calculates the total storage size of all items in the given BDR collection. It queries the Search API to retrieve and process the necessary data, and prints a summary including a human-readable size. It also grabs the collection title via the Collections API. 
 
 Args: --collection-pid (required)
 
@@ -75,7 +75,9 @@ Human: 239.49 GB
 
 ### gather_extracted_text.py (detailed)
 
-Collects EXTRACTED_TEXT BDR data-streams across all items in the given collection, writing a single combined text file (prefixed by PID delimiters) and a detailed listing JSON. It enumerates members via the Search API, locates EXTRACTED_TEXT links (parent or hasPart child), streams content with retries/throttling, and saves progress after every item to support interruptions and resuming without overloading the server. It shows a progress display, uses human-readable size summaries, and offers an optional `--test-limit` flag for testing convenience. Because many collections with text are named "Theses and Dissertations", the collection name also shows the parent, for context, as in the example below.
+Collects EXTRACTED_TEXT BDR data-streams across all items in the given collection, writing a single combined text file and a detailed listing JSON. Separate documents, in the combined file, are prefixed with PID delimiters, like `---|||start-of-pid:bdr:386312|||---`
+
+The script gits a list of items via the Search API, locates EXTRACTED_TEXT links (parent or hasPart child), and streams content with retries and throttling, and saves progress after every item, so that if processing is interrupted, it's easy to resume via re-running the same command, with no concern about overloading the server. The script shows a progress display, uses human-readable size summaries, and offers an optional `--test-limit` flag for testing convenience. Because many collections with text are named "Theses and Dissertations", the collection name also shows the parent, for context, as in the example below.
 
 Args: --collection-pid (required), --output-dir (required), --test-limit (optional).
 
