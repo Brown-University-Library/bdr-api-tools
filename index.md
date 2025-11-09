@@ -46,6 +46,7 @@ Assembles data from the item-api and summarizes zip-file contents for the given 
 
 ## detailed info
 
+_(The "Args" usage examples don't show the optional `--help` flag, but it's available for all tools.)_
 
 ### calc_collection_size.py (detailed)
 
@@ -77,10 +78,19 @@ Human: 239.49 GB
 
 Collects EXTRACTED_TEXT BDR data-streams across all items in the given collection, writing a single combined text file and a detailed listing JSON. Separate documents, in the combined file, are prefixed with PID delimiters, like `---|||start-of-pid:bdr:386312|||---`
 
-The script gits a list of items via the Search API, locates EXTRACTED_TEXT links (parent or hasPart child), and streams content with retries and throttling, and saves progress after every item, so that if processing is interrupted, it's easy to resume via re-running the same command, with no concern about overloading the server. The script shows a progress display, uses human-readable size summaries, and offers an optional `--test-limit` flag for testing convenience. Because many collections with text are named "Theses and Dissertations", the collection name also shows the parent, for context, as in the example below.
+The script gets a list of items via the Search API, locates EXTRACTED_TEXT links (parent or hasPart child), and streams content with retries and throttling, and saves progress after every item, so that if processing is interrupted, it's easy to resume via re-running the same command (will not re-download already downloaded content). The script shows a progress display, uses human-readable size summaries, and offers an optional `--test-limit` flag for convenience when experimenting. 
+
+All output directory-names are timestamped, so you don't have to worry about overwriting previous runs. The directory-name also includes the collection-pid, for easy identification. The listing JSON file includes a summary of the run, and a list of all items processed, with their PIDs and primary titles. All output file-names, and the output directory-name, contain the collection-pid, for easy identification. 
+
+Because many collections with text are named "Theses and Dissertations", the collection name also shows the parent-collection (in parentheses), for context, like this:
+
+```
+[snip]
+    "collection_primary_title": "Theses and Dissertations -- (from Computer Science)"
+[snip]
+```
 
 Args: --collection-pid (required), --output-dir (required), --test-limit (optional).
-
 
 Example usage:
 ```
@@ -94,9 +104,6 @@ Output:
 % cd ./run-20250913T133756-0400-bdr_bfttpwkj 
 
 % ls                                        
-total 1368
- ./
- ../
  checkpoint_for_collection_pid-bdr_bfttpwkj.json
  extracted_text_for_collection_pid-bdr_bfttpwkj.txt
  listing_for_collection_pid-bdr_bfttpwkj.json
@@ -163,7 +170,7 @@ Not `cat`-ing the `extracted_text_for_collection_pid-bdr_bfttpwkj.txt` -- it con
 
 ### show_zip_info.py (detailed)
 
-Fetches data from the item-api and summarizes (based on extension) zip-file contents for the given item. It also lists, and summarizes, zip-file contents for all child-items. In addition to the per-item summary, it also summarizes the filetype counts across both parent and all child-items.
+Assembles data from the item-api and summarizes (based on extension) zip-file contents for the given item. It also lists, and summarizes, zip-file contents for all child-items. In addition to the per-item summary, it also summarizes the filetype counts across both parent and all child-items.
 
 Args: --item_pid (required).
 
