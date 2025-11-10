@@ -20,9 +20,6 @@ Args:
   --collection-pid (required)
   --output-dir (required)
   --test-limit (optional) -- convenient for testing
-
-TODO:
-- Review docstrings for style and accuracy.
 """
 
 import argparse
@@ -1150,4 +1147,9 @@ def main() -> int:
 
 
 if __name__ == '__main__':
+    """
+    Runs main() and exits with its return value.
+    - If all goes well, returns 0.
+    - Otherwise, returns the value returned by main().
+    """
     raise SystemExit(main())
