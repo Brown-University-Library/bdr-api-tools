@@ -8,6 +8,8 @@
 
 import argparse
 
+import httpx
+
 """
 Runs spaCy's named entity recognition on an item's extracted-text, if it exists.
 
@@ -18,16 +20,17 @@ Args:
   --item-pid (required)
 """
 
-BASE = 'https://repository.library.brown.edu'
-ITEM_URL_TPL = f'{BASE}/api/items/{{pid}}/'
-STORAGE_URL_TPL = f'{BASE}/storage/{{pid}}/EXTRACTED_TEXT/'
+BASE_URL: str = 'https://repository.library.brown.edu'
+ITEM_URL_TPL: str = f'{BASE_URL}/api/items/THE_PID/'
+STORAGE_URL_TPL: str = f'{BASE_URL}/storage/THE_PID/EXTRACTED_TEXT/'
 
 
 def call_item_api(item_pid) -> dict:
     """
     Calls the item-api to determine how to access the extracted-text datastream.
     """
-    item_api_response = httpx.get(ITEM_URL_TPL.format(pid=item_pid))
+    item_api_url: str = ITEM_URL_TPL.replace('THE_PID', item_pid)
+    item_api_response = httpx.get(item_api_url)
     return item_api_response.json()
 
 
