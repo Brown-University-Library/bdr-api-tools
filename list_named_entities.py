@@ -30,8 +30,9 @@ def call_item_api(item_pid) -> dict:
     Calls the item-api to determine how to access the extracted-text datastream.
     """
     item_api_url: str = ITEM_URL_TPL.replace('THE_PID', item_pid)
-    item_api_response = httpx.get(item_api_url)
-    return item_api_response.json()
+    item_api_response: httpx.Response = httpx.get(item_api_url)
+    item_api_response_jdict: dict = item_api_response.json()
+    return item_api_response_jdict
 
 
 def manage_ner_processing(item_pid) -> None:
@@ -39,7 +40,7 @@ def manage_ner_processing(item_pid) -> None:
     Manages the named entity recognition (NER) processing for a single item.
     """
     ## call item-api to determine how to access extracted-text ------
-    item_api_response = call_item_api(item_pid)
+    item_api_response_jdict: dict = call_item_api(item_pid)
     ## process item-api response ------------------------------------
     ## grab extracted-text datastream -------------------------------
     ## process extracted-text with spaCy ----------------------------
