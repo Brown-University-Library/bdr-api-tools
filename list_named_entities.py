@@ -21,7 +21,7 @@ import argparse
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import httpx
 import spacy
@@ -85,15 +85,17 @@ def get_extracted_text_datastream(extracted_text_url) -> str:
     return extracted_text
 
 
-def build_err_response(item_pid: str, err: str) -> str:
+def build_err_response(item_pid: str, err: str, start_time: datetime) -> str:
     """
     Builds an error response string.
     Called by: manage_ner_processing()
     """
+    elapsed: timedelta = datetime.now() - start_time
     meta: dict = {
-        'timestamp': datetime.now().isoformat(),
         'item_pid': item_pid,
         'tool': 'list_named_entities',
+        'timestamp': start_time.isoformat(),
+        'elapsed': str(elapsed),
     }
     rsp_dct: dict = {
         'meta': meta,
@@ -126,14 +128,15 @@ def manage_ner_processing(item_pid) -> None:
     Manages the named entity recognition (NER) processing for a single item.
     Called by: dundermain
     """
-    ## call item-api to determine how to access extracted-text ------
+    start_time: datetime = datetime.now()
+    ## call item-api to grab item data -----------------------------
     item_api_response_jdict: dict = call_item_api(item_pid)
     ## get extracted-text url --------------------------------------
     extracted_text_url, err = evaluate_item_api_response(item_api_response_jdict)
     assert type(extracted_text_url) is str
     assert type(err) is str
     if not extracted_text_url:
-        rsp: str = build_err_response(item_pid, err)
+        rsp: str = build_err_response(item_pid, err, start_time)
         return rsp
     ## grab extracted-text datastream -------------------------------
     extracted_text: str = get_extracted_text_datastream(extracted_text_url)
