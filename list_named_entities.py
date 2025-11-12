@@ -22,6 +22,7 @@ import argparse
 import json
 import logging
 import os
+import pprint
 from datetime import datetime, timedelta
 
 import httpx
@@ -86,6 +87,7 @@ def get_extracted_text_datastream(extracted_text_url) -> str:
     Called by: manage_ner_processing()
     """
     extracted_text: str = httpx.get(extracted_text_url).text
+    # log.debug(f'extracted_text, ``{extracted_text}``')
     return extracted_text
 
 
@@ -128,7 +130,15 @@ def process_extracted_text_with_spacy(extracted_text: str) -> list:
     """
     nlp = spacy.load('en_core_web_sm')
     doc: spacy.tokens.Doc = nlp(extracted_text)
-    return doc
+    # log.debug(f'doc, ``{doc}``')
+    spacy_named_entities = []
+    for ent in doc.ents:
+        token = ent.text
+        label = ent.label_
+        tuple_ = (token, label)
+        spacy_named_entities.append(tuple_)
+    log.debug(f'spacy_named_entities, ``{pprint.pformat(spacy_named_entities)}``')
+    return spacy_named_entities
 
 
 def manage_ner_processing(item_pid) -> None:
