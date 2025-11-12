@@ -2,7 +2,8 @@
 # requires-python = "==3.12.*"
 # dependencies = [
 #   "httpx~=0.28.0",
-#   "spacy~=3.8.0"
+#   "spacy~=3.8.0",
+#   "en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl"
 # ]
 # ///
 
@@ -57,6 +58,7 @@ def call_item_api(item_pid) -> dict:
     item_api_url: str = ITEM_URL_TPL.replace('THE_PID', item_pid)
     item_api_response: httpx.Response = httpx.get(item_api_url)
     item_api_response_jdict: dict = item_api_response.json()
+    # log.debug(f'item_api_response_jdict, ``{pprint.pformat(item_api_response_jdict)}``')
     return item_api_response_jdict
 
 
@@ -68,11 +70,13 @@ def evaluate_item_api_response(item_api_response_jdict) -> tuple[str, str]:
     extracted_text_url: str = ''
     err: str = ''
     try:
-        extracted_text_url: str = item_api_response_jdict['links']['EXTRACTED_TEXT']
+        extracted_text_url: str = item_api_response_jdict['links']['content_datastreams']['EXTRACTED_TEXT']
     except KeyError:
         message: str = 'extracted-text not at `links.EXTRACTED_TEXT`'
         log.warning(message)
         err = message
+    log.debug(f'extracted_text_url: {extracted_text_url}')
+    log.debug(f'err: {err}')
     return extracted_text_url, err
 
 
@@ -90,6 +94,9 @@ def build_err_response(item_pid: str, err: str, start_time: datetime) -> str:
     Builds an error response string.
     Called by: manage_ner_processing()
     """
+    log.debug(f'item_pid: {item_pid}')
+    log.debug(f'err: {err}')
+    log.debug(f'start_time: {start_time}')
     elapsed: timedelta = datetime.now() - start_time
     meta: dict = {
         'item_pid': item_pid,
@@ -119,6 +126,7 @@ def process_extracted_text_with_spacy(extracted_text: str) -> list:
     Processes the extracted-text with spaCy.
     Called by: manage_ner_processing()
     """
+    nlp = spacy.load('en_core_web_sm')
     doc: spacy.tokens.Doc = nlp(extracted_text)
     return doc
 
