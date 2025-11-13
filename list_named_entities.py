@@ -123,7 +123,7 @@ def get_extracted_datastream(extracted_text_url: str) -> str:
     return extracted_text
 
 
-def process_extracted_text_with_spacy(extracted_text: str) -> list:
+def extract_entities(extracted_text: str) -> list:
     """
     Processes the extracted-text with spaCy.
     Called by: manage_ner_processing()
@@ -139,6 +139,32 @@ def process_extracted_text_with_spacy(extracted_text: str) -> list:
         spacy_named_entities.append(tuple_)
     log.debug(f'spacy_named_entities, ``{pprint.pformat(spacy_named_entities)}``')
     return spacy_named_entities
+
+
+class Processor:
+    def __init__(self, original_entities: list):
+        self.original_entities: list = original_entities
+        self.cleaned_entities: list = []
+        self.processed_entities: list = []
+
+    def manage_processing(self) -> list:
+        """
+        Manages the processing of named entities.
+        Called by: manage_ner_processing()
+        """
+        self.cleaned_entities: list = self.clean_entities(self.original_entities)
+        return self.processed_entities
+
+    def clean_entities(self, original_entities: list) -> list:
+        """
+        Cleans up entity text by stripping whitespace/newlines.
+        Called by: manage_processing()
+        """
+        cleaned_entities: list = []
+        for value, label in original_entities:
+            cleaned_value = value.strip()
+            cleaned_entities.append((cleaned_value, label))
+        return cleaned_entities
 
 
 def manage_ner_processing(item_pid) -> None:
@@ -158,9 +184,11 @@ def manage_ner_processing(item_pid) -> None:
         return rsp
     ## grab extracted-text datastream -------------------------------
     extracted_text: str = get_extracted_text_datastream(extracted_text_url)
-    ## process extracted-text with spaCy ----------------------------
-    ner_results: list = process_extracted_text_with_spacy(extracted_text)
-    ## process spaCy results ----------------------------------------
+    ## run spaCy ----------------------------------------------------
+    original_entities: list = extract_entities(extracted_text)
+    ## process entities ---------------------------------------------
+    processor: Processor = Processor()
+    processed_entities: list = processor.manage_processing(original_entities)
     ## return response ----------------------------------------------
     return
 
