@@ -157,7 +157,7 @@ class Processor:
 
     def clean_entities(self) -> None:
         """
-        Cleans up entity text by stripping whitespace/newlines.
+        Cleans up entity text by stripping whitespace andnewlines.
         Called by: manage_processing()
         """
         self.cleaned_entities: list = []
