@@ -155,16 +155,17 @@ class Processor:
         self.cleaned_entities: list = self.clean_entities(self.original_entities)
         return self.processed_entities
 
-    def clean_entities(self, original_entities: list) -> list:
+    def clean_entities(self) -> None:
         """
         Cleans up entity text by stripping whitespace/newlines.
         Called by: manage_processing()
         """
-        cleaned_entities: list = []
-        for value, label in original_entities:
+        self.cleaned_entities: list = []
+        for value, label in self.original_entities:
             cleaned_value = value.strip()
-            cleaned_entities.append((cleaned_value, label))
-        return cleaned_entities
+            cleaned_value = cleaned_value.replace('\n', '')
+            self.cleaned_entities.append((cleaned_value, label))
+        return
 
 
 def manage_ner_processing(item_pid) -> None:
