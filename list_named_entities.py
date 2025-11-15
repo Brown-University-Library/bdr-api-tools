@@ -144,6 +144,16 @@ def extract_entities(extracted_text: str) -> list:
 
 class Processor:
     def __init__(self, original_entities: list | None = None):
+        """
+        Original entities are the named entities returned by spaCy.
+        They may look like this:
+        [
+          ("Egypt", "GPE"),
+          ("Barca", "PRODUCT"),
+          ("Egypt\n", "GPE"),
+          -- etc --
+        ]
+        """
         self.original_entities: list = original_entities if original_entities is not None else []
         self.cleaned_entities: list = []
         self.processed_entities: list = []
@@ -171,11 +181,54 @@ class Processor:
 
     def make_uniques(self) -> None:
         """
-        Creates a list of unique entities, with counts.
+        Creates a list of alphabetical unique entities, with counts.
         Called by: manage_processing()
+
+        Input (from self.cleaned_entities):
+        [
+            ('Egypt', 'GPE'),
+            ('Barca', 'PRODUCT'),
+            ('Africa From', 'LOC'),
+            ('Cyrene', 'PERSON'),
+            ('Egypt', 'GPE'),
+        ]
+
+        Output (to self.sorted_unique_entries):
+        [
+            (('Africa From', 'LOC'), 1),
+            (('Barca', 'PRODUCT'), 1),
+            (('Cyrene', 'PERSON'), 1),
+            (('Egypt', 'GPE'), 2),
+        ]
+
+        The process:
+
+        (Experiment to avoid the much more direct, but dense:
+        ```self.sorted_unique_entries = sorted(named_entity_counts.items(), key=lambda kv: (kv[0][0].lower(), kv[0][1]))```)
+
+        First creates a Counter object from self.cleaned_entities, like this:
+        Counter(
+            {('Egypt', 'GPE'): 2,
+             ('Barca', 'PRODUCT'): 1,
+             ('Africa From', 'LOC'): 1,
+             ('Cyrene', 'PERSON'): 1}
+            )
+
+        Then builds sortable tuples: (value_lower, ne_label, value_original, count)
+        Then sorts.
+        Then reconstructs the desired shape: [ ((value, label), count), ... ]
         """
-        named_entity_counts = Counter(self.cleaned_entities)
-        self.sorted_unique_entries = sorted(named_entity_counts.items(), key=lambda kv: (kv[0][0].lower(), kv[0][1]))
+        named_entity_counts: Counter = Counter(self.cleaned_entities)
+        ## build sortable tuples ------------------------------------
+        sortable: list[tuple[str, str, str, int]] = []
+        for (value, label), count in named_entity_counts.items():
+            sortable.append((value.lower(), label, value, count))
+        ## sort via default tuple ordering --------------------------
+        sortable.sort()
+        ## reconstruct desired shape ---------------------------------
+        self.sorted_unique_entries = []
+        for _value_lower, label, value, count in sortable:
+            self.sorted_unique_entries.append(((value, label), count))
         log.debug(f'sorted_unique_entries, ``{pprint.pformat(self.sorted_unique_entries)}``')
         return
 
