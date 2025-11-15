@@ -158,6 +158,7 @@ class Processor:
         self.cleaned_entities: list = []
         self.processed_entities: list = []
         self.sorted_unique_entries: list = []
+        self.by_type_counts: dict = {}
 
     def manage_processing(self) -> list:
         """
@@ -165,6 +166,8 @@ class Processor:
         Called by: manage_ner_processing()
         """
         self.cleaned_entities: list = self.clean_entities(self.original_entities)
+        self.make_uniques()
+        self.group_by_entity()
         return self.processed_entities
 
     def clean_entities(self) -> None:
@@ -239,6 +242,23 @@ class Processor:
             self.sorted_unique_entries.append(((value, label), count))
         log.debug(f'sorted_unique_entries, ``{pprint.pformat(self.sorted_unique_entries)}``')
         return
+
+        ## end def make_uniques()
+
+    def group_by_entity(self) -> None:
+        """
+        Makes lists of unique entities and their counts.
+        Called by: manage_processing()
+        """
+        self.by_type_counts = {}
+        for (value, label), count in self.sorted_unique_entries:
+            self.by_type_counts.setdefault(label, {})[value] = (
+                self.by_type_counts.setdefault(label, {}).get(value, 0) + count
+            )
+        log.debug(f'by_type_counts, ``{pprint.pformat(self.by_type_counts)}``')
+        return
+
+    ## end def group_by_entity()
 
     ## end class Processor
 

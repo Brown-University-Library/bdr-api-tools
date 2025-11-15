@@ -54,6 +54,29 @@ class TestProcessor(unittest.TestCase):
         ]
         self.assertEqual(computed, expected)
 
+    def test_group_by_entity(self) -> None:
+        """
+        Checks that the group_by_entity() returns results grouped by entity type.
+        """
+        sorted_unique_entries_input: list = [
+            (('Africa From', 'LOC'), 1),
+            (('Barca', 'PRODUCT'), 1),
+            (('Cyrene', 'PERSON'), 1),
+            (('Egypt', 'GPE'), 2),
+            (('Tunisia', 'GPE'), 1),
+        ]
+        processor: Processor = Processor()
+        processor.sorted_unique_entries = sorted_unique_entries_input
+        processor.group_by_entity()
+        computed: dict = processor.by_type_counts
+        expected: dict = {
+            'GPE': {'Egypt': 2, 'Tunisia': 1},
+            'LOC': {'Africa From': 1},
+            'PERSON': {'Cyrene': 1},
+            'PRODUCT': {'Barca': 1},
+        }
+        self.assertEqual(computed, expected)
+
 
 if __name__ == '__main__':
     unittest.main()
