@@ -35,7 +35,7 @@ class TestProcessor(unittest.TestCase):
         """
         Checks that the make_uniques() returns an alphabetized list of unique entities, with counts.
         """
-        cleaned_entities: list = [
+        cleaned_entities_lst: list = [
             ('Egypt', 'GPE'),
             ('Barca', 'PRODUCT'),
             ('Africa From', 'LOC'),
@@ -43,7 +43,7 @@ class TestProcessor(unittest.TestCase):
             ('Egypt', 'GPE'),
         ]
         processor: Processor = Processor()
-        processor.cleaned_entities = cleaned_entities
+        processor.cleaned_entities = cleaned_entities_lst
         processor.make_uniques()
         computed: list = processor.sorted_unique_entries
         expected: list = [
