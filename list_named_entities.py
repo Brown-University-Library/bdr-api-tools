@@ -161,7 +161,7 @@ class Processor:
         self.by_entity_display: dict = {}
         self.by_top_x_display: dict = {}
 
-    def manage_processing(self, cut_off: int = 3) -> None:
+    def manage_processing(self) -> None:
         """
         Manages the processing of named entities.
         Called by: manage_ner_processing()
@@ -169,7 +169,8 @@ class Processor:
         self.clean_entities()
         self.make_uniques()
         self.group_by_entity()
-        self.determine_top_x(cut_off)
+        CUT_OFF: int = 4
+        self.determine_top_x(CUT_OFF)
         return
 
     def clean_entities(self) -> None:
@@ -343,8 +344,8 @@ def build_response(item_pid: str, processor: Processor, start_time: datetime) ->
     }
     rsp_dct = {
         'meta': meta,
-        'data_all': processor.by_entity_display,
-        'data_top_x': processor.by_top_x_display,
+        'data_all_sorted_by_value_alphabetically': processor.by_entity_display,
+        'data_top_4_sorted_by_count_descending': processor.by_top_x_display,
     }
     jsn: str = json.dumps(rsp_dct, sort_keys=True, indent=2)
     return jsn
