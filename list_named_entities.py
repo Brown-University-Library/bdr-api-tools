@@ -138,7 +138,7 @@ def extract_entities(extracted_text: str) -> list:
         label = ent.label_
         tuple_ = (token, label)
         spacy_named_entities.append(tuple_)
-    log.debug(f'spacy_named_entities, ``{pprint.pformat(spacy_named_entities)}``')
+    # log.debug(f'spacy_named_entities, ``{pprint.pformat(spacy_named_entities)}``')
     return spacy_named_entities
 
 
@@ -156,7 +156,6 @@ class Processor:
         """
         self.original_entities: list = original_entities if original_entities is not None else []
         self.cleaned_entities: list = []
-        self.processed_entities: list = []
         self.sorted_unique_entries: list = []
         self.by_entity_display: dict = {}
 
@@ -165,10 +164,10 @@ class Processor:
         Manages the processing of named entities.
         Called by: manage_ner_processing()
         """
-        self.cleaned_entities: list = self.clean_entities(self.original_entities)
+        self.clean_entities()
         self.make_uniques()
         self.group_by_entity()
-        return self.processed_entities
+        return self.by_entity_display
 
     def clean_entities(self) -> None:
         """
@@ -298,9 +297,12 @@ def manage_ner_processing(item_pid) -> None:
     ## run spaCy ----------------------------------------------------
     original_entities: list = extract_entities(extracted_text)
     ## process entities ---------------------------------------------
-    processor: Processor = Processor()
-    processed_entities: list = processor.manage_processing(original_entities)
+    processor: Processor = Processor(original_entities)
+    processed_entities: list = processor.manage_processing()
     ## return response ----------------------------------------------
+    # rsp: str = build_response(item_pid, processed_entities, start_time)
+    jsn: str = json.dumps(processed_entities, indent=2)
+    print(jsn)
     return
 
 
