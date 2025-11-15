@@ -23,6 +23,7 @@ import json
 import logging
 import os
 import pprint
+from collections import Counter
 from datetime import datetime, timedelta
 
 import httpx
@@ -142,10 +143,11 @@ def extract_entities(extracted_text: str) -> list:
 
 
 class Processor:
-    def __init__(self, original_entities: list):
-        self.original_entities: list = original_entities
+    def __init__(self, original_entities: list | None = None):
+        self.original_entities: list = original_entities if original_entities is not None else []
         self.cleaned_entities: list = []
         self.processed_entities: list = []
+        self.sorted_unique_entries: list = []
 
     def manage_processing(self) -> list:
         """
@@ -166,6 +168,18 @@ class Processor:
             cleaned_value = cleaned_value.replace('\n', '')
             self.cleaned_entities.append((cleaned_value, label))
         return
+
+    def make_uniques(self) -> None:
+        """
+        Creates a list of unique entities, with counts.
+        Called by: manage_processing()
+        """
+        named_entity_counts = Counter(self.cleaned_entities)
+        self.sorted_unique_entries = sorted(named_entity_counts.items(), key=lambda kv: (kv[0][0].lower(), kv[0][1]))
+        log.debug(f'sorted_unique_entries, ``{pprint.pformat(self.sorted_unique_entries)}``')
+        return
+
+    ## end class Processor
 
 
 def manage_ner_processing(item_pid) -> None:
