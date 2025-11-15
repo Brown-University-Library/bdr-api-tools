@@ -77,6 +77,47 @@ class TestProcessor(unittest.TestCase):
         }
         self.assertEqual(computed, expected)
 
+    def test_determine_top_x(self) -> None:
+        """
+        Checks that the determine_top_x() returns results grouped by entity type -- only for the top-x results.
+        """
+        by_entity_display_input: dict = {
+            'GPE': {'Algeria': 1, 'Egypt': 2, 'Tunisia': 1},
+            'LOC': {
+                'Opt-1': 1,
+                'Opt-2': 9,
+                'Opt-3': 2,
+                'Opt-4': 10,
+                'Opt-5': 1,
+                'Opt-6': 2,
+            },
+            'PERSON': {'Cyrene': 1},
+            'PRODUCT': {'Barca': 1},
+        }
+        processor: Processor = Processor()
+        processor.by_entity_display = by_entity_display_input
+        cut_off: int = 3
+        processor.determine_top_x(cut_off)
+        computed: dict = processor.by_top_x_display
+        expected: dict = {
+            'GPE': [
+                ('2', ['Egypt']),
+                ('1', ['Algeria', 'Tunisia']),
+            ],
+            'LOC': [
+                ('10', ['Opt-4']),
+                ('9', ['Opt-2']),
+                ('2', ['Opt-3', 'Opt-6']),
+            ],
+            'PERSON': [
+                ('1', 'Cyrene'),
+            ],
+            'PRODUCT': [
+                ('1', 'Barca'),
+            ],
+        }
+        self.assertEqual(computed, expected)
+
 
 if __name__ == '__main__':
     unittest.main()

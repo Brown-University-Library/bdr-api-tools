@@ -48,7 +48,8 @@ log = logging.getLogger(__name__)
 
 ## constants --------------------------------------------------------
 BASE_URL: str = 'https://repository.library.brown.edu'
-ITEM_URL_TPL: str = f'{BASE_URL}/api/items/THE_PID/'
+ITEM_URL_TPL: str = f'{BASE_URL}/studio/item/THE_PID/'
+ITEM_API_URL_TPL: str = f'{BASE_URL}/api/items/THE_PID/'
 STORAGE_URL_TPL: str = f'{BASE_URL}/storage/THE_PID/EXTRACTED_TEXT/'
 
 
@@ -57,7 +58,7 @@ def call_item_api(item_pid) -> dict:
     Calls the item-api to determine how to access the extracted-text datastream.
     Called by: manage_ner_processing()
     """
-    item_api_url: str = ITEM_URL_TPL.replace('THE_PID', item_pid)
+    item_api_url: str = ITEM_API_URL_TPL.replace('THE_PID', item_pid)
     item_api_response: httpx.Response = httpx.get(item_api_url)
     item_api_response_jdict: dict = item_api_response.json()
     # log.debug(f'item_api_response_jdict, ``{pprint.pformat(item_api_response_jdict)}``')
@@ -158,8 +159,9 @@ class Processor:
         self.cleaned_entities: list = []
         self.sorted_unique_entries: list = []
         self.by_entity_display: dict = {}
+        self.by_top_x_display: dict = {}
 
-    def manage_processing(self) -> list:
+    def manage_processing(self, cut_off: int = 3) -> None:
         """
         Manages the processing of named entities.
         Called by: manage_ner_processing()
@@ -167,7 +169,8 @@ class Processor:
         self.clean_entities()
         self.make_uniques()
         self.group_by_entity()
-        return self.by_entity_display
+        self.determine_top_x(cut_off)
+        return
 
     def clean_entities(self) -> None:
         """
@@ -274,23 +277,64 @@ class Processor:
         log.debug(f'by_type_counts, ``{pprint.pformat(self.by_entity_display)}``')
         return
 
+    def determine_top_x(self, cut_off: int) -> None:
+        """
+        Determines the top X entities for each entity type.
+        Called by: Processor.manage_processing()
+        """
+        self.by_top_x_display = {}
+
+        for label, value_counts in self.by_entity_display.items():
+            # If a category has only a single distinct value, preserve the original simple shape
+            if len(value_counts) == 1:
+                only_value: str = next(iter(value_counts.keys()))
+                only_count: int = value_counts[only_value]
+                self.by_top_x_display[label] = [(str(only_count), only_value)]
+                continue
+
+            # Group values by their count
+            counts_to_values: dict[int, list[str]] = {}
+            for value, count in value_counts.items():
+                bucket: list[str] | None = counts_to_values.get(count)
+                if bucket is None:
+                    counts_to_values[count] = [value]
+                else:
+                    bucket.append(value)
+
+            # Sort counts descending, and values within each count ascending
+            sorted_counts: list[int] = sorted(counts_to_values.keys(), reverse=True)
+            top_counts: list[int] = sorted_counts[:cut_off]
+
+            top_list: list[tuple[str, list[str]]] = []
+            for cnt in top_counts:
+                values_for_cnt: list[str] = counts_to_values[cnt]
+                values_for_cnt.sort()
+                top_list.append((str(cnt), values_for_cnt))
+
+            self.by_top_x_display[label] = top_list
+        return
+
     ## end class Processor
 
 
-def build_response(item_pid: str, processed_entities: list, start_time: datetime) -> str:
+def build_response(item_pid: str, processor: Processor, start_time: datetime) -> str:
     """
     Builds a response for the named entity recognition (NER) processing for a single item.
     Called by: manage_ner_processing()
     """
+    time_stamp: str = start_time.isoformat()
+    time_taken: float = (datetime.now() - start_time).total_seconds()
+    time_taken_str: str = f'{time_taken:.1f} seconds'
     meta = {
-        'time_stamp': start_time.isoformat(),
-        'time_taken': (datetime.now() - start_time).total_seconds(),
+        'time_stamp': time_stamp,
+        'time_taken': time_taken_str,
         'item_pid': item_pid,
-        'item_url': ITEM_URL_TPL.format(item_pid),
+        'item_url': ITEM_URL_TPL.replace('THE_PID', item_pid),
     }
     rsp_dct = {
         'meta': meta,
-        'data': processed_entities,
+        'data_all': processor.by_entity_display,
+        'data_top_x': processor.by_top_x_display,
     }
     jsn: str = json.dumps(rsp_dct, sort_keys=True, indent=2)
     return jsn
@@ -317,9 +361,9 @@ def manage_ner_processing(item_pid) -> None:
     original_entities: list = extract_entities(extracted_text)
     ## process entities ---------------------------------------------
     processor: Processor = Processor(original_entities)
-    processed_entities: list = processor.manage_processing()
+    processor.manage_processing()
     ## return response ----------------------------------------------
-    jsn: str = build_response(item_pid, processed_entities, start_time)
+    jsn: str = build_response(item_pid, processor, start_time)
     # jsn: str = json.dumps(processed_entities, sort_keys=True, indent=2)
     print(jsn)
     return
