@@ -301,7 +301,7 @@ def manage_ner_processing(item_pid) -> None:
     processed_entities: list = processor.manage_processing()
     ## return response ----------------------------------------------
     # rsp: str = build_response(item_pid, processed_entities, start_time)
-    jsn: str = json.dumps(processed_entities, indent=2)
+    jsn: str = json.dumps(processed_entities, sort_keys=True, indent=2)
     print(jsn)
     return
 
