@@ -203,9 +203,6 @@ class Processor:
 
         The process:
 
-        (Experiment to avoid the much more direct, but dense:
-        ```self.sorted_unique_entries = sorted(named_entity_counts.items(), key=lambda kv: (kv[0][0].lower(), kv[0][1]))```)
-
         First creates a Counter object from self.cleaned_entities, like this:
         Counter(
             {('Egypt', 'GPE'): 2,
@@ -217,8 +214,19 @@ class Processor:
         Then builds sortable tuples: (value_lower, ne_label, value_original, count)
         Then sorts.
         Then reconstructs the desired shape: [ ((value, label), count), ... ]
+
+        This is an experiment to avoid the much more direct, but dense:
+        ```self.sorted_unique_entries = sorted(named_entity_counts.items(), key=lambda kv: (kv[0][0].lower(), kv[0][1]))```
+        Here's how much faster the one-liner is:
+        n=  1000 current_impl: 0.0210s  one_liner: 0.0016s  ratio=12.96x
+        n=  5000 current_impl: 0.1059s  one_liner: 0.0107s  ratio=9.89x
+        n= 20000 current_impl: 0.4328s  one_liner: 0.0486s  ratio=8.90x
+        ...based on running `temp_benchmark_make_uniques.py` multiple times and averaging the results.
+
+        Despite the significant ratios, I'll leave the more explicit code for now, because the total time increase
+        isn't burdensome.
         """
-        named_entity_counts: Counter = Counter(self.cleaned_entities)
+        named_entity_counts: Counter[tuple[str, str]] = Counter(self.cleaned_entities)
         ## build sortable tuples ------------------------------------
         sortable: list[tuple[str, str, str, int]] = []
         for (value, label), count in named_entity_counts.items():
