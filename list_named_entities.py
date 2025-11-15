@@ -270,8 +270,8 @@ class Processor:
         """
         self.by_type_counts = {}
         for (value, label), count in self.sorted_unique_entries:
-            bucket = self.by_type_counts.setdefault(label, {})
-            bucket[value] = bucket.get(value, 0) + count
+            bucket = self.by_type_counts.setdefault(label, {})  # creates bucket if it doesn't exist
+            bucket[value] = bucket.get(value, 0) + count  # updating bucket auto-updates `by_type_counts`
         log.debug(f'by_type_counts, ``{pprint.pformat(self.by_type_counts)}``')
         return
 
