@@ -8,7 +8,7 @@ class TestProcessor(unittest.TestCase):
     Tests the Processor class.
     """
 
-    def test_clean_entitiesR(self) -> None:
+    def test_clean_entities(self) -> None:
         """
         Checks that newlines and whitespace are stripped from entity text.
         """
@@ -33,24 +33,24 @@ class TestProcessor(unittest.TestCase):
 
     def test_make_uniques(self) -> None:
         """
-        Checks that the make_uniques method works as expected.
+        Checks that the make_uniques() returns an alphabetized list of unique entities, with counts.
         """
-        original_entities: list = [
+        cleaned_entities: list = [
             ('Egypt', 'GPE'),
             ('Barca', 'PRODUCT'),
             ('Africa From', 'LOC'),
             ('Cyrene', 'PERSON'),
             ('Egypt', 'GPE'),
         ]
-        processor: Processor = Processor(original_entities)
-        processor.clean_entities()
+        processor: Processor = Processor()
+        processor.cleaned_entities = cleaned_entities
         processor.make_uniques()
         computed: list = processor.sorted_unique_entries
         expected: list = [
-            ('Africa From', 'LOC'),
-            ('Barca', 'PRODUCT'),
-            ('Cyrene', 'PERSON'),
-            ('Egypt', 'GPE'),
+            (('Africa From', 'LOC'), 1),
+            (('Barca', 'PRODUCT'), 1),
+            (('Cyrene', 'PERSON'), 1),
+            (('Egypt', 'GPE'), 2),
         ]
         self.assertEqual(computed, expected)
 
