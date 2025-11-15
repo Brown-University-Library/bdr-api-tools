@@ -277,6 +277,25 @@ class Processor:
     ## end class Processor
 
 
+def build_response(item_pid: str, processed_entities: list, start_time: datetime) -> str:
+    """
+    Builds a response for the named entity recognition (NER) processing for a single item.
+    Called by: manage_ner_processing()
+    """
+    meta = {
+        'time_stamp': start_time.isoformat(),
+        'time_taken': (datetime.now() - start_time).total_seconds(),
+        'item_pid': item_pid,
+        'item_url': ITEM_URL_TPL.format(item_pid),
+    }
+    rsp_dct = {
+        'meta': meta,
+        'data': processed_entities,
+    }
+    jsn: str = json.dumps(rsp_dct, sort_keys=True, indent=2)
+    return jsn
+
+
 def manage_ner_processing(item_pid) -> None:
     """
     Manages the named entity recognition (NER) processing for a single item.
@@ -300,8 +319,8 @@ def manage_ner_processing(item_pid) -> None:
     processor: Processor = Processor(original_entities)
     processed_entities: list = processor.manage_processing()
     ## return response ----------------------------------------------
-    # rsp: str = build_response(item_pid, processed_entities, start_time)
-    jsn: str = json.dumps(processed_entities, sort_keys=True, indent=2)
+    jsn: str = build_response(item_pid, processed_entities, start_time)
+    # jsn: str = json.dumps(processed_entities, sort_keys=True, indent=2)
     print(jsn)
     return
 
