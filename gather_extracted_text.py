@@ -57,9 +57,9 @@ if log_level <= logging.INFO:
 
 BASE = 'https://repository.library.brown.edu'
 SEARCH_URL = f'{BASE}/api/search/'
-ITEM_URL_TPL = f'{BASE}/api/items/{{pid}}/'
+ITEM_API_URL_TPL = f'{BASE}/api/items/{{pid}}/'
 STORAGE_URL_TPL = f'{BASE}/storage/{{pid}}/EXTRACTED_TEXT/'
-COLLECTION_URL_TPL = f'{BASE}/api/collections/{{pid}}/'
+COLLECTION_API_URL_TPL = f'{BASE}/api/collections/{{pid}}/'
 
 
 class CollectionMetadata:
@@ -118,7 +118,7 @@ class UrlBuilder:
 
         Called by `ExtractionProcessor.process_pid()`, `main()`
         """
-        return ITEM_URL_TPL.format(pid=pid)
+        return ITEM_API_URL_TPL.format(pid=pid)
 
     def studio_url(self, pid: str) -> str:
         """
@@ -323,7 +323,7 @@ class ApiClient:
 
         Called by `ExtractionProcessor.process_pid()`
         """
-        url: str = ITEM_URL_TPL.format(pid=pid)
+        url: str = ITEM_API_URL_TPL.format(pid=pid)
         log.debug(f'trying item url, ``{url}``')
         resp: httpx.Response = self.get_with_retries(url)
         resp.raise_for_status()
@@ -337,7 +337,7 @@ class ApiClient:
 
         Called by `main()`
         """
-        url: str = COLLECTION_URL_TPL.format(pid=pid)
+        url: str = COLLECTION_API_URL_TPL.format(pid=pid)
         resp: httpx.Response = self.get_with_retries(url)
         resp.raise_for_status()
         return resp.json()
