@@ -158,7 +158,7 @@ class Processor:
         self.cleaned_entities: list = []
         self.processed_entities: list = []
         self.sorted_unique_entries: list = []
-        self.by_type_counts: dict = {}
+        self.by_entity_display: dict = {}
 
     def manage_processing(self) -> list:
         """
@@ -268,11 +268,11 @@ class Processor:
 
         Called by: Processor.manage_processing()
         """
-        self.by_type_counts = {}
+        self.by_entity_display = {}
         for (value, label), count in self.sorted_unique_entries:
-            bucket = self.by_type_counts.setdefault(label, {})  # creates bucket if it doesn't exist
+            bucket = self.by_entity_display.setdefault(label, {})  # creates bucket if it doesn't exist
             bucket[value] = bucket.get(value, 0) + count  # updating bucket auto-updates `by_type_counts`
-        log.debug(f'by_type_counts, ``{pprint.pformat(self.by_type_counts)}``')
+        log.debug(f'by_type_counts, ``{pprint.pformat(self.by_entity_display)}``')
         return
 
     ## end class Processor

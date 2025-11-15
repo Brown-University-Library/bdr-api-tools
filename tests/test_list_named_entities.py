@@ -68,7 +68,7 @@ class TestProcessor(unittest.TestCase):
         processor: Processor = Processor()
         processor.sorted_unique_entries = sorted_unique_entries_input
         processor.group_by_entity()
-        computed: dict = processor.by_type_counts
+        computed: dict = processor.by_entity_display
         expected: dict = {
             'GPE': {'Egypt': 2, 'Tunisia': 1},
             'LOC': {'Africa From': 1},
