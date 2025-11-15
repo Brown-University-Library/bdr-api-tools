@@ -271,7 +271,7 @@ class Processor:
         self.by_entity_display = {}
         for (value, label), count in self.sorted_unique_entries:
             bucket = self.by_entity_display.setdefault(label, {})  # creates bucket if it doesn't exist
-            bucket[value] = bucket.get(value, 0) + count  # updating bucket auto-updates `by_type_counts`
+            bucket[value] = bucket.get(value, 0) + count  # updating bucket auto-updates `by_entity_display`
         log.debug(f'by_type_counts, ``{pprint.pformat(self.by_entity_display)}``')
         return
 
