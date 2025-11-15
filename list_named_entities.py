@@ -247,18 +247,33 @@ class Processor:
 
     def group_by_entity(self) -> None:
         """
-        Makes lists of unique entities and their counts.
-        Called by: manage_processing()
+        Makes dict of entities and their value-counts, like:
+
+        Input (from self.sorted_unique_entries):
+        [
+            (('Africa From', 'LOC'), 1),
+            (('Barca', 'PRODUCT'), 1),
+            (('Cyrene', 'PERSON'), 1),
+            (('Egypt', 'GPE'), 2),
+            (('Tunisia', 'GPE'), 1),
+        ]
+
+        Output (to self.by_type_counts):
+        {
+            'GPE': {'Egypt': 2, 'Tunisia': 1},
+            'LOC': {'Africa From': 1},
+            'PERSON': {'Cyrene': 1},
+            'PRODUCT': {'Barca': 1},
+        }
+
+        Called by: Processor.manage_processing()
         """
         self.by_type_counts = {}
         for (value, label), count in self.sorted_unique_entries:
-            self.by_type_counts.setdefault(label, {})[value] = (
-                self.by_type_counts.setdefault(label, {}).get(value, 0) + count
-            )
+            bucket = self.by_type_counts.setdefault(label, {})
+            bucket[value] = bucket.get(value, 0) + count
         log.debug(f'by_type_counts, ``{pprint.pformat(self.by_type_counts)}``')
         return
-
-    ## end def group_by_entity()
 
     ## end class Processor
 
