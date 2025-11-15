@@ -284,15 +284,22 @@ class Processor:
         """
         self.by_top_x_display = {}
 
-        for label, value_counts in self.by_entity_display.items():
-            # If a category has only a single distinct value, preserve the original simple shape
+        for entity_label, value_counts in self.by_entity_display.items():
+            # simple-case, preserve simple data ---------------------
             if len(value_counts) == 1:
                 only_value: str = next(iter(value_counts.keys()))
                 only_count: int = value_counts[only_value]
-                self.by_top_x_display[label] = [(str(only_count), only_value)]
+                self.by_top_x_display[entity_label] = [(str(only_count), only_value)]
                 continue
 
-            # Group values by their count
+            # build counts-to-values dict ---------------------------
+            """
+            example counts-to-values dict built:
+            counts_to_values = {
+                2: ['Egypt', 'Tunisia'],
+                1: ['Africa From', 'Barca', 'Cyrene']
+            }
+            """
             counts_to_values: dict[int, list[str]] = {}
             for value, count in value_counts.items():
                 bucket: list[str] | None = counts_to_values.get(count)
@@ -301,17 +308,20 @@ class Processor:
                 else:
                     bucket.append(value)
 
-            # Sort counts descending, and values within each count ascending
-            sorted_counts: list[int] = sorted(counts_to_values.keys(), reverse=True)
-            top_counts: list[int] = sorted_counts[:cut_off]
+            # sort --------------------------------------------------
+            sorted_counts: list[int] = sorted(
+                counts_to_values.keys(), reverse=True
+            )  # counts descending, and values within each count ascending
 
+            # build top-list ----------------------------------------
+            top_counts: list[int] = sorted_counts[:cut_off]
             top_list: list[tuple[str, list[str]]] = []
             for cnt in top_counts:
                 values_for_cnt: list[str] = counts_to_values[cnt]
                 values_for_cnt.sort()
                 top_list.append((str(cnt), values_for_cnt))
 
-            self.by_top_x_display[label] = top_list
+            self.by_top_x_display[entity_label] = top_list
         return
 
     ## end class Processor
