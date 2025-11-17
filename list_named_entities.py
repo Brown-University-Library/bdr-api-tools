@@ -93,29 +93,6 @@ def get_extracted_text_datastream(extracted_text_url) -> str:
     return extracted_text
 
 
-# def build_err_response(item_pid: str, err: str, start_time: datetime) -> str:
-#     """
-#     Builds an error response string.
-#     Called by: manage_ner_processing()
-#     """
-#     log.debug(f'item_pid: {item_pid}')
-#     log.debug(f'err: {err}')
-#     log.debug(f'start_time: {start_time}')
-#     elapsed: timedelta = datetime.now() - start_time
-#     meta: dict = {
-#         'item_pid': item_pid,
-#         'tool': 'list_named_entities',
-#         'timestamp': start_time.isoformat(),
-#         'elapsed': str(elapsed),
-#     }
-#     rsp_dct: dict = {
-#         'meta': meta,
-#         'error': err,
-#     }
-#     jsn: str = json.dumps(rsp_dct, ensure_ascii=False)
-#     return jsn
-
-
 def build_err_response(item_pid: str, err: str, start_time: datetime) -> str:
     """
     Builds an error response string.
@@ -346,7 +323,7 @@ class Processor:
     ## end class Processor
 
 
-def assemble_meta(item_pid: str, start_time: datetime) -> dict:
+def assemble_meta(item_pid: str, start_time: datetime, title: str) -> dict:
     """
     Assembles the meta data for the response.
     Called by: build_response() and build_err_response()
@@ -355,21 +332,22 @@ def assemble_meta(item_pid: str, start_time: datetime) -> dict:
     time_taken: float = (datetime.now() - start_time).total_seconds()
     time_taken_str: str = f'{time_taken:.1f} seconds'
     meta = {
-        'time_stamp': time_stamp,
-        'time_taken': time_taken_str,
         'item_pid': item_pid,
         'item_url': ITEM_URL_TPL.replace('THE_PID', item_pid),
         'spaCy_version': spacy.__version__,
+        'time_stamp': time_stamp,
+        'time_taken': time_taken_str,
+        'title': title,
     }
     return meta
 
 
-def build_response(item_pid: str, processor: Processor, start_time: datetime) -> str:
+def build_response(item_pid: str, processor: Processor, start_time: datetime, title: str) -> str:
     """
     Builds a response for the named entity recognition (NER) processing for a single item.
     Called by: manage_ner_processing()
     """
-    meta = assemble_meta(item_pid, start_time)
+    meta = assemble_meta(item_pid, start_time, title)
     rsp_dct = {
         'meta': meta,
         'data_all_sorted_by_value_alphabetically': processor.by_entity_display,
@@ -379,55 +357,39 @@ def build_response(item_pid: str, processor: Processor, start_time: datetime) ->
     return jsn
 
 
-# def build_response(item_pid: str, processor: Processor, start_time: datetime) -> str:
-#     """
-#     Builds a response for the named entity recognition (NER) processing for a single item.
-#     Called by: manage_ner_processing()
-#     """
-#     time_stamp: str = start_time.isoformat()
-#     time_taken: float = (datetime.now() - start_time).total_seconds()
-#     time_taken_str: str = f'{time_taken:.1f} seconds'
-#     meta = {
-#         'time_stamp': time_stamp,
-#         'time_taken': time_taken_str,
-#         'item_pid': item_pid,
-#         'item_url': ITEM_URL_TPL.replace('THE_PID', item_pid),
-#         'spaCy_version': spacy.__version__,
-#     }
-#     rsp_dct = {
-#         'meta': meta,
-#         'data_all_sorted_by_value_alphabetically': processor.by_entity_display,
-#         'data_top_4_sorted_by_count_descending': processor.by_top_x_display,
-#     }
-#     jsn: str = json.dumps(rsp_dct, sort_keys=True, indent=2, ensure_ascii=False)
-#     return jsn
-
-
 def manage_ner_processing(item_pid) -> None:
     """
     Manages the named entity recognition (NER) processing for a single item.
     Called by: dundermain
     """
+    print('starting')
     start_time: datetime = datetime.now()
     ## call item-api to grab item data -----------------------------
+    print('accessing item-data')
     item_api_response_jdict: dict = call_item_api(item_pid)
+    ## get title ---------------------------------------------------
+    title: str = item_api_response_jdict['primary_title']
     ## get extracted-text url --------------------------------------
+    print('determining extracted-text-url')
     extracted_text_url, err = evaluate_item_api_response(item_api_response_jdict)
     assert type(extracted_text_url) is str
     assert type(err) is str
     if not extracted_text_url:
-        rsp: str = build_err_response(item_pid, err, start_time)
+        rsp: str = build_err_response(item_pid, err, start_time, title)
         return rsp
     ## grab extracted-text datastream -------------------------------
+    print('accessing extracted-text')
     extracted_text: str = get_extracted_text_datastream(extracted_text_url)
     ## run spaCy ----------------------------------------------------
+    print('running spaCy')
     original_entities: list = extract_entities(extracted_text)
     ## process entities ---------------------------------------------
+    print('processing entities')
     processor: Processor = Processor(original_entities)
     processor.manage_processing()
     ## return response ----------------------------------------------
-    jsn: str = build_response(item_pid, processor, start_time)
-    # jsn: str = json.dumps(processed_entities, sort_keys=True, indent=2)
+    print('preparing response')
+    jsn: str = build_response(item_pid, processor, start_time, title)
     print(jsn)
     return
 
