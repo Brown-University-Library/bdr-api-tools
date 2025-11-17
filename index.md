@@ -307,6 +307,25 @@ Output (excerpt):
       ["3", ["Latin"]],
       [snip]
 
+
+
+  },
+  "meta": {
+    "glossary": [
+      "CARDINAL — numerals that don’t fall under another type.",
+      "DATE — absolute or relative dates or periods.",
+      "EVENT — named hurricanes, battles, wars, sports events, etc.",
+      [snip]
+    ],
+    "item_pid": "bdr:263",
+    "item_url": "https://repository.library.brown.edu/studio/item/bdr:263/",
+    "spaCy_version": "3.8.8",
+    "time_stamp": "2025-11-17T08:09:26.689041",
+    "time_taken": "23.2 seconds",
+    "title": "The Fitting and the Virtuous in Stoic Ethics"
+  }
+}
+
 ```
 
 ---
