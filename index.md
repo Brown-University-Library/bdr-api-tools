@@ -175,13 +175,138 @@ Not `cat`-ing the `extracted_text_for_collection_pid-bdr_bfttpwkj.txt` -- it con
 
 ### list_named_entities.py (detailed)
 
-Runs spaCy on an item's extracted-text. Displays a unique alphabetical listing of all the entities found, with counts. Also displays a short-list of the most common entities, sorted by count (the full list can be calculated from the unique alphabetical listing). Includes a _meta_ section which includes timestamp, time-taken, item-pid, and item-title.
+Runs spaCy on an item's extracted-text. Displays a unique alphabetical listing of all the entities found, with counts. Also displays a short-list of the most common entities, sorted by count (the full list can be calculated from the unique alphabetical listing). Includes a _meta_ section which includes a glossary, timestamp, time-taken, item-pid, and item-title.
 
 Args: --item_pid (required).
 
 Example usage:
 ```
-uv run https://brown-university-library.github.io/bdr-api-tools/list_named_entities.py --item_pid bdr:833705
+uv run https://brown-university-library.github.io/bdr-api-tools/list_named_entities.py --item_pid bdr:263
+```
+
+Output (excerpt):
+
+```
+- starting
+- accessing item-data
+- determining extracted-text-url
+- accessing extracted-text
+- running spaCy
+- processing entities
+- preparing response
+
+{
+  "data_all_sorted_by_value_alphabetically": {
+    "CARDINAL": {
+      "1": 75,
+      "1, 406-": 1,
+      "1-20": 1,
+      [snip]
+    "DATE": {
+      "1.11.15": 1,
+      "1.11.16-17": 1,
+      "1.11.17-18": 1,
+      [snip]
+    "EVENT": {
+      "LS 41C": 1,
+      "LS 61B": 1,
+      "LS 61I": 3,
+      [snip]
+    "FAC": {
+      "Bonhöffer’s": 1,
+      "Cicero": 2,
+      "Hades": 1,
+      [snip]
+    "GPE": {
+      "A.A.": 2,
+      "Academica": 1,
+      "Adversus": 1,
+      [snip]
+    "LANGUAGE": {
+      "Aristo": 1,
+      "English": 6,
+      "Latin": 3,
+      [snip]
+    "LAW": {
+      "Chapter": 5,
+      "Chapter 1.I.A.": 1,
+      "Chapter 12": 1,
+      [snip]
+    "LOC": {
+      "Cat": 1,
+      "Chapter": 3,
+      "Chapter I.C": 1,
+      [snip]
+    "MONEY": {
+      "101": 1,
+      "122                                ii": 1,
+      "163accords": 1,
+      "197    ii": 1,
+      [snip]
+    "NORP": {
+      "Appetite": 1,
+      "Aristotelis": 3,
+      "Arrian": 1,
+      [snip]
+    "ORDINAL": {
+      "5th": 1,
+      "First": 40,
+      "Second": 31,
+      [snip]
+    "ORG": {
+      "\u0001": 1,
+      "210 &": 1,
+      "A Treatise of Human Nature": 1,
+      [snip]
+    "PERSON": {
+      "33I. Note": 1,
+      "400d11": 1,
+      "41 H.\f                                                                                                        196": 1,
+      [snip]
+    "PRODUCT": {
+      "7.106": 3,
+      "7.111-113": 1,
+      "7.113-16": 1,
+      [snip]
+    "QUANTITY": {
+      "2.84.24-85.3": 1,
+      "2.98.17-99.2": 1,
+      "3.37-8)": 1,
+      [snip]
+    "TIME": {
+      "the night": 1
+      [snip]
+    "WORK_OF_ART": {
+      "30I. See": 1,
+      "40H": 1,
+      "A Puzzle for Stoic Ethics": 1,
+      [snip]
+  },
+  "data_top_4_sorted_by_count_descending": {
+    "CARDINAL": [
+      ["228", ["one"]],
+      ["104", ["two"]],
+      [snip]
+    "DATE": [
+      ["70", ["1987"]],
+      ["67", ["1990"]],
+      [snip]
+    "EVENT": [
+      ["4", ["White 2007"]],
+      ["3", ["LS 61I", "Pomeroy 1999"]],
+    "FAC": [
+      ["2", ["Cicero"]],
+      ["1", ["Bonhöffer’s", "Hades", "IV.c.i", "International Center", [snip]]]
+      [snip]
+    "GPE": [
+      ["82", ["D.L."]],
+      ["43", ["SB"]],
+      [snip]
+    "LANGUAGE": [
+      ["6", ["English"]],
+      ["3", ["Latin"]],
+      [snip]
+
 ```
 
 ---
