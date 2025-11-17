@@ -331,6 +331,26 @@ def assemble_meta(item_pid: str, start_time: datetime, title: str) -> dict:
     time_taken: float = (datetime.now() - start_time).total_seconds()
     time_taken_str: str = f'{time_taken:.1f} seconds'
     meta = {
+        'glossary': [
+            'CARDINAL — numerals that don’t fall under another type.',
+            'DATE — absolute or relative dates or periods.',
+            'EVENT — named hurricanes, battles, wars, sports events, etc.',
+            'FAC — buildings, airports, highways, bridges, etc.',
+            'GPE — countries, cities, states.',
+            'LANGUAGE — any named language.',
+            'LAW — named documents made into laws.',
+            'LOC — non-GPE locations: mountain ranges, bodies of water, etc.',
+            'MONEY — monetary values, including unit.',
+            'NORP — nationalities or religious or political groups.',
+            'ORDINAL — “first”, “second”, etc.',
+            'ORG — companies, agencies, institutions, etc.',
+            'PERCENT — percentage, including “%”.',
+            'PERSON — people, including fictional.',
+            'PRODUCT — objects, vehicles, foods, etc. (not services).',
+            'QUANTITY — measurements (e.g., weight, distance).',
+            'TIME — times smaller than a day.',
+            'WORK_OF_ART — titles of books, songs, etc.',
+        ],
         'item_pid': item_pid,
         'item_url': ITEM_URL_TPL.replace('THE_PID', item_pid),
         'spaCy_version': spacy.__version__,
