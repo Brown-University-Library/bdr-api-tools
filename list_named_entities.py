@@ -23,8 +23,9 @@ import json
 import logging
 import os
 import pprint
+import sys
 from collections import Counter
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import httpx
 import spacy
@@ -93,7 +94,7 @@ def get_extracted_text_datastream(extracted_text_url) -> str:
     return extracted_text
 
 
-def build_err_response(item_pid: str, err: str, start_time: datetime) -> str:
+def build_err_response(item_pid: str, err: str, start_time: datetime, title: str) -> dict:
     """
     Builds an error response string.
     Called by: manage_ner_processing()
@@ -101,14 +102,12 @@ def build_err_response(item_pid: str, err: str, start_time: datetime) -> str:
     log.debug(f'item_pid: {item_pid}')
     log.debug(f'err: {err}')
     log.debug(f'start_time: {start_time}')
-    elapsed: timedelta = datetime.now() - start_time
-    meta: dict = assemble_meta(item_pid, start_time)
+    meta: dict = assemble_meta(item_pid, start_time, title)
     rsp_dct: dict = {
         'meta': meta,
         'error': err,
     }
-    jsn: str = json.dumps(rsp_dct, ensure_ascii=False)
-    return jsn
+    return rsp_dct
 
 
 def get_extracted_datastream(extracted_text_url: str) -> str:
@@ -376,7 +375,8 @@ def manage_ner_processing(item_pid) -> None:
     assert type(err) is str
     if not extracted_text_url:
         rsp: str = build_err_response(item_pid, err, start_time, title)
-        return rsp
+        pprint.pprint(rsp)
+        sys.exit(1)
     ## grab extracted-text datastream -------------------------------
     log.info('accessing extracted-text')
     extracted_text: str = get_extracted_text_datastream(extracted_text_url)
