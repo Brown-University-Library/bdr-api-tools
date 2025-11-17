@@ -112,7 +112,7 @@ def build_err_response(item_pid: str, err: str, start_time: datetime) -> str:
         'meta': meta,
         'error': err,
     }
-    jsn: str = json.dumps(rsp_dct)
+    jsn: str = json.dumps(rsp_dct, ensure_ascii=False)
     return jsn
 
 
@@ -341,13 +341,14 @@ def build_response(item_pid: str, processor: Processor, start_time: datetime) ->
         'time_taken': time_taken_str,
         'item_pid': item_pid,
         'item_url': ITEM_URL_TPL.replace('THE_PID', item_pid),
+        'spaCy_version': spacy.__version__,
     }
     rsp_dct = {
         'meta': meta,
         'data_all_sorted_by_value_alphabetically': processor.by_entity_display,
         'data_top_4_sorted_by_count_descending': processor.by_top_x_display,
     }
-    jsn: str = json.dumps(rsp_dct, sort_keys=True, indent=2)
+    jsn: str = json.dumps(rsp_dct, sort_keys=True, indent=2, ensure_ascii=False)
     return jsn
 
 
