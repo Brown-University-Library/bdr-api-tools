@@ -362,15 +362,15 @@ def manage_ner_processing(item_pid) -> None:
     Manages the named entity recognition (NER) processing for a single item.
     Called by: dundermain
     """
-    print('starting')
+    log.info('starting')
     start_time: datetime = datetime.now()
     ## call item-api to grab item data -----------------------------
-    print('accessing item-data')
+    log.info('accessing item-data')
     item_api_response_jdict: dict = call_item_api(item_pid)
     ## get title ---------------------------------------------------
     title: str = item_api_response_jdict['primary_title']
     ## get extracted-text url --------------------------------------
-    print('determining extracted-text-url')
+    log.info('determining extracted-text-url')
     extracted_text_url, err = evaluate_item_api_response(item_api_response_jdict)
     assert type(extracted_text_url) is str
     assert type(err) is str
@@ -378,17 +378,17 @@ def manage_ner_processing(item_pid) -> None:
         rsp: str = build_err_response(item_pid, err, start_time, title)
         return rsp
     ## grab extracted-text datastream -------------------------------
-    print('accessing extracted-text')
+    log.info('accessing extracted-text')
     extracted_text: str = get_extracted_text_datastream(extracted_text_url)
     ## run spaCy ----------------------------------------------------
-    print('running spaCy')
+    log.info('running spaCy')
     original_entities: list = extract_entities(extracted_text)
     ## process entities ---------------------------------------------
-    print('processing entities')
+    log.info('processing entities')
     processor: Processor = Processor(original_entities)
     processor.manage_processing()
     ## return response ----------------------------------------------
-    print('preparing response')
+    log.info('preparing response')
     jsn: str = build_response(item_pid, processor, start_time, title)
     print(jsn)
     return
