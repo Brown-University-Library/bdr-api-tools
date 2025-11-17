@@ -29,10 +29,15 @@ Calculates the total storage size of all items in the given BDR collection. It q
 
 ---
 
-
 ### gather_extracted_text.py (brief)
 
 Collects EXTRACTED_TEXT across all items (parent & child) in a collection, writing a single combined text file and a detailed listing JSON. It saves progress to resume elegantly if interruptions occur, and offers an optional --test-limit flag for testing convenience. 
+
+---
+
+### list_named_entities.py (brief)
+
+Runs spaCy on an item's extracted-text, and lists the named entities found.
 
 ---
 
@@ -164,6 +169,20 @@ Not `cat`-ing the `extracted_text_for_collection_pid-bdr_bfttpwkj.txt` -- it con
 `---|||start-of-pid:bdr:386312|||---`
 
 [Code](https://github.com/Brown-University-Library/bdr-api-tools/blob/main/gather_extracted_text.py)
+
+---
+
+
+### list_named_entities.py (detailed)
+
+Runs spaCy on an item's extracted-text. Displays a unique alphabetical listing of all the entities found, with counts. Also displays a short-list of the most common entities, sorted by count (the full list can be calculated from the unique alphabetical listing). Includes a _meta_ section which includes timestamp, time-taken, item-pid, and item-title.
+
+Args: --item_pid (required).
+
+Example usage:
+```
+uv run https://brown-university-library.github.io/bdr-api-tools/list_named_entities.py --item_pid bdr:833705
+```
 
 ---
 
