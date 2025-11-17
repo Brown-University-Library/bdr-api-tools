@@ -93,6 +93,29 @@ def get_extracted_text_datastream(extracted_text_url) -> str:
     return extracted_text
 
 
+# def build_err_response(item_pid: str, err: str, start_time: datetime) -> str:
+#     """
+#     Builds an error response string.
+#     Called by: manage_ner_processing()
+#     """
+#     log.debug(f'item_pid: {item_pid}')
+#     log.debug(f'err: {err}')
+#     log.debug(f'start_time: {start_time}')
+#     elapsed: timedelta = datetime.now() - start_time
+#     meta: dict = {
+#         'item_pid': item_pid,
+#         'tool': 'list_named_entities',
+#         'timestamp': start_time.isoformat(),
+#         'elapsed': str(elapsed),
+#     }
+#     rsp_dct: dict = {
+#         'meta': meta,
+#         'error': err,
+#     }
+#     jsn: str = json.dumps(rsp_dct, ensure_ascii=False)
+#     return jsn
+
+
 def build_err_response(item_pid: str, err: str, start_time: datetime) -> str:
     """
     Builds an error response string.
@@ -102,12 +125,7 @@ def build_err_response(item_pid: str, err: str, start_time: datetime) -> str:
     log.debug(f'err: {err}')
     log.debug(f'start_time: {start_time}')
     elapsed: timedelta = datetime.now() - start_time
-    meta: dict = {
-        'item_pid': item_pid,
-        'tool': 'list_named_entities',
-        'timestamp': start_time.isoformat(),
-        'elapsed': str(elapsed),
-    }
+    meta: dict = assemble_meta(item_pid, start_time)
     rsp_dct: dict = {
         'meta': meta,
         'error': err,
@@ -328,10 +346,10 @@ class Processor:
     ## end class Processor
 
 
-def build_response(item_pid: str, processor: Processor, start_time: datetime) -> str:
+def assemble_meta(item_pid: str, start_time: datetime) -> dict:
     """
-    Builds a response for the named entity recognition (NER) processing for a single item.
-    Called by: manage_ner_processing()
+    Assembles the meta data for the response.
+    Called by: build_response() and build_err_response()
     """
     time_stamp: str = start_time.isoformat()
     time_taken: float = (datetime.now() - start_time).total_seconds()
@@ -343,6 +361,15 @@ def build_response(item_pid: str, processor: Processor, start_time: datetime) ->
         'item_url': ITEM_URL_TPL.replace('THE_PID', item_pid),
         'spaCy_version': spacy.__version__,
     }
+    return meta
+
+
+def build_response(item_pid: str, processor: Processor, start_time: datetime) -> str:
+    """
+    Builds a response for the named entity recognition (NER) processing for a single item.
+    Called by: manage_ner_processing()
+    """
+    meta = assemble_meta(item_pid, start_time)
     rsp_dct = {
         'meta': meta,
         'data_all_sorted_by_value_alphabetically': processor.by_entity_display,
@@ -350,6 +377,30 @@ def build_response(item_pid: str, processor: Processor, start_time: datetime) ->
     }
     jsn: str = json.dumps(rsp_dct, sort_keys=True, indent=2, ensure_ascii=False)
     return jsn
+
+
+# def build_response(item_pid: str, processor: Processor, start_time: datetime) -> str:
+#     """
+#     Builds a response for the named entity recognition (NER) processing for a single item.
+#     Called by: manage_ner_processing()
+#     """
+#     time_stamp: str = start_time.isoformat()
+#     time_taken: float = (datetime.now() - start_time).total_seconds()
+#     time_taken_str: str = f'{time_taken:.1f} seconds'
+#     meta = {
+#         'time_stamp': time_stamp,
+#         'time_taken': time_taken_str,
+#         'item_pid': item_pid,
+#         'item_url': ITEM_URL_TPL.replace('THE_PID', item_pid),
+#         'spaCy_version': spacy.__version__,
+#     }
+#     rsp_dct = {
+#         'meta': meta,
+#         'data_all_sorted_by_value_alphabetically': processor.by_entity_display,
+#         'data_top_4_sorted_by_count_descending': processor.by_top_x_display,
+#     }
+#     jsn: str = json.dumps(rsp_dct, sort_keys=True, indent=2, ensure_ascii=False)
+#     return jsn
 
 
 def manage_ner_processing(item_pid) -> None:
