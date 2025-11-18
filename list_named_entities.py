@@ -352,11 +352,11 @@ def assemble_meta(item_pid: str, start_time: datetime, title: str) -> dict:
             'WORK_OF_ART — titles of books, songs, etc.',
         ],
         'item_pid': item_pid,
+        'item_title': title,
         'item_url': ITEM_URL_TPL.replace('THE_PID', item_pid),
         'spaCy_version': spacy.__version__,
         'time_stamp': time_stamp,
         'time_taken': time_taken_str,
-        'title': title,
     }
     return meta
 
