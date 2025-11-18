@@ -4,7 +4,12 @@ version = "0.0.0"
 description = "Scripts for interacting with the Brown Digital Repository API."
 readme = ""
 requires-python = ">=3.12,<3.13"
-dependencies = ["httpx", "humanize", "tqdm"]
+dependencies = [
+    "httpx~=0.28.0", 
+    "humanize~=4.14.0", 
+    "spacy~=3.8.0",
+    "tqdm~=4.67.0"
+    ]
 
 [dependency-groups]
 local = []

@@ -1,7 +1,7 @@
 # /// script
 # requires-python = "==3.12.*"
 # dependencies = [
-#   "httpx"
+#   "httpx~=0.28.0"
 # ]
 # ///
 
@@ -191,7 +191,7 @@ def parse_item_zip_info(
             'item_zip_filetype_summary': item_zip_filetype_summary,
             'has_parts_zip_info': has_parts_info,
             'overall_zip_filetype_summary': overall_zip_filetype_summary,
-        }
+        },
     }
 
 
@@ -199,9 +199,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """
     Parses cli args.
     """
-    parser = argparse.ArgumentParser(
-        description='Fetch BDR item and gather zip file lists for item and children.'
-    )
+    parser = argparse.ArgumentParser(description='Fetch BDR item and gather zip file lists for item and children.')
     parser.add_argument(
         '--item_pid',
         required=True,

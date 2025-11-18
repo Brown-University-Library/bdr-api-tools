@@ -15,6 +15,7 @@ For Brown community members, a recommendation: if you're off-campus, enable [Bro
 
 - calc_collection_size.py ([brief](#calc_collection_sizepy-brief)), ([detailed](#calc_collection_sizepy-detailed))
 - gather_extracted_text.py ([brief](#gather_extracted_textpy-brief)), ([detailed](#gather_extracted_textpy-detailed))
+- list_named_entities.py ([brief](#list_named_entitiespy-brief)), ([detailed](#list_named_entitiespy-detailed))
 - show_zip_info.py ([brief](#show_zip_infopy-brief)), ([detailed](#show_zip_infopy-detailed))
 
 ---
@@ -29,10 +30,15 @@ Calculates the total storage size of all items in the given BDR collection. It q
 
 ---
 
-
 ### gather_extracted_text.py (brief)
 
 Collects EXTRACTED_TEXT across all items (parent & child) in a collection, writing a single combined text file and a detailed listing JSON. It saves progress to resume elegantly if interruptions occur, and offers an optional --test-limit flag for testing convenience. 
+
+---
+
+### list_named_entities.py (brief)
+
+Runs [spaCy's](https://github.com/explosion/spaCy) named-entity-recognition ([NER](https://en.wikipedia.org/wiki/Named-entity_recognition)) on an item's extracted-text, and lists the named entities found.
 
 ---
 
@@ -164,6 +170,201 @@ Not `cat`-ing the `extracted_text_for_collection_pid-bdr_bfttpwkj.txt` -- it con
 `---|||start-of-pid:bdr:386312|||---`
 
 [Code](https://github.com/Brown-University-Library/bdr-api-tools/blob/main/gather_extracted_text.py)
+
+---
+
+
+### list_named_entities.py (detailed)
+
+Runs [spaCy's](https://github.com/explosion/spaCy) named-entity-recognition ([NER](https://en.wikipedia.org/wiki/Named-entity_recognition)) on an item's extracted-text. Displays a unique alphabetical listing of all the entities found, with counts. Also displays a short-list of the most common entities, sorted by count (the full list can be calculated from the alphabetical listing). Includes a _meta_ section which includes a glossary, timestamp, time-taken, item-pid, item-title, and the version of spaCy used.
+
+Args: --item_pid (required).
+
+Example usage:
+```
+uv run https://brown-university-library.github.io/bdr-api-tools/list_named_entities.py --item_pid bdr:263
+```
+
+Output (excerpt):
+
+```
+- starting
+- accessing item-data
+- determining extracted-text-url
+- accessing extracted-text
+- running spaCy
+- processing entities
+- preparing response
+
+{
+  "data_all_sorted_by_value_alphabetically": {
+    "CARDINAL": {
+      "1": 75,
+      "1, 406-": 1,
+      "1-20": 1,
+      [snip]
+    "DATE": {
+      "1.11.15": 1,
+      "1.11.16-17": 1,
+      "1.11.17-18": 1,
+      [snip]
+    "EVENT": {
+      "LS 41C": 1,
+      "LS 61B": 1,
+      "LS 61I": 3,
+      [snip]
+    "FAC": {
+      "Bonhöffer’s": 1,
+      "Cicero": 2,
+      "Hades": 1,
+      [snip]
+    "GPE": {
+      "A.A.": 2,
+      "Academica": 1,
+      "Adversus": 1,
+      [snip]
+    "LANGUAGE": {
+      "Aristo": 1,
+      "English": 6,
+      "Latin": 3,
+      [snip]
+    "LAW": {
+      "Chapter": 5,
+      "Chapter 1.I.A.": 1,
+      "Chapter 12": 1,
+      [snip]
+    "LOC": {
+      "Cat": 1,
+      "Chapter": 3,
+      "Chapter I.C": 1,
+      [snip]
+    "MONEY": {
+      "101": 1,
+      "122                                ii": 1,
+      "163accords": 1,
+      "197    ii": 1,
+      [snip]
+    "NORP": {
+      "Appetite": 1,
+      "Aristotelis": 3,
+      "Arrian": 1,
+      [snip]
+    "ORDINAL": {
+      "5th": 1,
+      "First": 40,
+      "Second": 31,
+      [snip]
+    "ORG": {
+      "\u0001": 1,
+      "210 &": 1,
+      "A Treatise of Human Nature": 1,
+      [snip]
+    "PERSON": {
+      "33I. Note": 1,
+      "400d11": 1,
+      "41 H.\f                                                                                                        196": 1,
+      [snip]
+    "PRODUCT": {
+      "7.106": 3,
+      "7.111-113": 1,
+      "7.113-16": 1,
+      [snip]
+    "QUANTITY": {
+      "2.84.24-85.3": 1,
+      "2.98.17-99.2": 1,
+      "3.37-8)": 1,
+      [snip]
+    "TIME": {
+      "the night": 1
+      [snip]
+    "WORK_OF_ART": {
+      "30I. See": 1,
+      "40H": 1,
+      "A Puzzle for Stoic Ethics": 1,
+      [snip]
+  },
+  "data_top_4_sorted_by_count_descending": {
+    "CARDINAL": [
+      ["228", ["one"]],
+      ["104", ["two"]],
+      [snip]
+    "DATE": [
+      ["70", ["1987"]],
+      ["67", ["1990"]],
+      [snip]
+    "EVENT": [
+      ["4", ["White 2007"]],
+      ["3", ["LS 61I", "Pomeroy 1999"]],
+    "FAC": [
+      ["2", ["Cicero"]],
+      ["1", ["Bonhöffer’s", "Hades", "IV.c.i", "International Center", [snip]]]
+      [snip]
+    "GPE": [
+      ["82", ["D.L."]],
+      ["43", ["SB"]],
+      [snip]
+    "LANGUAGE": [
+      ["6", ["English"]],
+      ["3", ["Latin"]],
+      [snip]
+    "LAW": [
+      ["17", ["Chapter Two"]],
+      ["10", ["Chapter IV"]],
+      [snip]
+    "LOC": [
+      ["7", ["Chapter III"]],
+      ["5", ["Inwood"]],
+      [snip]
+    "MONEY": [
+      ["1", ["101", "122                                ii", "163accords", "197    ii", [snip]]]
+    "NORP": [
+      ["149", ["Stoic"]],
+      ["146", ["Stoics"]],
+      [snip]
+    "ORDINAL": [
+      ["96", ["first"]],
+      ["41", ["second"]],
+      [snip]
+    "ORG": [
+      ["197", ["Epictetus"]],
+      ["135", ["D.L."]],
+      [snip]
+    "PERSON": [
+      ["117", ["Chrysippus"]],
+      ["114", ["Cic"]],
+      [snip]
+    "PRODUCT": [
+      ["45", ["Stob"]],
+      ["16", ["VS"]],
+      [snip]
+    "QUANTITY": [
+      ["2", ["one\u2019s feet"]],
+      ["1", ["2.84.24-85.3", "2.98.17-99.2", "3.37-8)"]],
+      [snip]
+    "TIME": [
+      ["1", "the night"],
+    "WORK_OF_ART": [
+      ["4", ["The Cambridge History of Hellenistic Philosophy"]],
+      ["3", ["Nature", "Stoic Ethics", "The Stoics"]],
+      [snip]
+    ]
+  },
+  "meta": {
+    "glossary": [
+      "CARDINAL — numerals that don’t fall under another type.",
+      "DATE — absolute or relative dates or periods.",
+      "EVENT — named hurricanes, battles, wars, sports events, etc.",
+      [snip]
+    ],
+    "item_pid": "bdr:263",
+    "item_title": "The Fitting and the Virtuous in Stoic Ethics",
+    "item_url": "https://repository.library.brown.edu/studio/item/bdr:263/",
+    "spaCy_version": "3.8.8",
+    "time_stamp": "2025-11-17T08:09:26.689041",
+    "time_taken": "23.2 seconds"
+  }
+}
+```
 
 ---
 
