@@ -59,9 +59,15 @@ def call_item_api(item_pid) -> dict:
     Calls the item-api to determine how to access the extracted-text datastream.
     Called by: manage_ner_processing()
     """
-    item_api_url: str = ITEM_API_URL_TPL.replace('THE_PID', item_pid)
-    item_api_response: httpx.Response = httpx.get(item_api_url)
-    item_api_response_jdict: dict = item_api_response.json()
+    item_api_response_jdict: dict = {}
+    try:
+        item_api_url: str = ITEM_API_URL_TPL.replace('THE_PID', item_pid)
+        item_api_response: httpx.Response = httpx.get(item_api_url)
+        log.debug(f'item_api_response, ``{item_api_response}``')
+        item_api_response_jdict: dict = item_api_response.json()
+    except Exception as e:
+        log.exception(f'Error calling item-api: {e}')
+        pass
     # log.debug(f'item_api_response_jdict, ``{pprint.pformat(item_api_response_jdict)}``')
     return item_api_response_jdict
 
@@ -386,6 +392,10 @@ def manage_ner_processing(item_pid) -> None:
     ## call item-api to grab item data -----------------------------
     log.info('accessing item-data')
     item_api_response_jdict: dict = call_item_api(item_pid)
+    if not item_api_response_jdict:
+        rsp: str = build_err_response(item_pid, 'unable to access item-api data', start_time, 'title-unavailable')
+        pprint.pprint(rsp)
+        sys.exit(1)
     ## get title ---------------------------------------------------
     title: str = item_api_response_jdict['primary_title']
     ## get extracted-text url --------------------------------------
