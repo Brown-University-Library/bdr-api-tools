@@ -1,8 +1,6 @@
-import tempfile
 import unittest
-from pathlib import Path
 
-from display_collection_activity import aggregate_monthly_counts, build_output_path, normalize_date_value, write_output_file
+from display_collection_activity import aggregate_monthly_counts, normalize_date_value
 
 
 class TestNormalizeDateValue(unittest.TestCase):
@@ -66,37 +64,6 @@ class TestAggregateMonthlyCounts(unittest.TestCase):
         self.assertEqual(result['items_skipped'], 2)
         self.assertEqual(result['date_field_used'], 'deposit_date')
         self.assertEqual(result['date_fields_used'], ['deposit_date'])
-
-
-class TestOutputPathAndWriting(unittest.TestCase):
-    """
-    Tests output path creation and file writing.
-    """
-
-    def test_build_output_path_generates_expected_filename(self):
-        """
-        Checks output filename generation.
-        """
-        output_path = build_output_path('/tmp/example-output', 'bdr:bwehb8b8')
-        self.assertEqual(output_path.name, 'collection_activity__bdr_bwehb8b8.json')
-
-    def test_write_output_file_writes_pretty_printed_json(self):
-        """
-        Checks JSON file writing behavior.
-        """
-        with tempfile.TemporaryDirectory() as temp_dir:
-            output_path = Path(temp_dir) / 'nested' / 'report.json'
-            output_data = {
-                '_meta_': {'collection_pid': 'bdr:test'},
-                'monthly_counts': {'2024-11': 2},
-            }
-
-            write_output_file(output_path, output_data)
-
-            file_text = output_path.read_text(encoding='utf-8')
-            self.assertTrue(file_text.endswith('\n'))
-            self.assertIn('\n  "_meta_": {\n', file_text)
-            self.assertIn('\n  "monthly_counts": {\n', file_text)
 
 
 if __name__ == '__main__':

@@ -7,10 +7,10 @@
 
 
 """
-Displays monthly BDR collection activity counts and writes them to a JSON file.
+Displays monthly BDR collection activity counts and prints formatted JSON.
 
 Usage:
-  uv run ./display_collection_activity.py --collection-pid bdr:bwehb8b8 --output-dir '/path/to/output-dir/'
+  uv run ./display_collection_activity.py --collection-pid bdr:bwehb8b8
 """
 
 import argparse
@@ -19,7 +19,6 @@ import re
 import sys
 from collections import Counter
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 import httpx
@@ -29,17 +28,6 @@ COLLECTION_API_TEMPLATE = 'https://repository.library.brown.edu/api/collections/
 DATE_FIELD = 'deposit_date'
 SEARCH_FIELDS: list[str] = ['pid', DATE_FIELD]
 MONTH_PATTERN = re.compile(r'^(\d{4})-(\d{2})')
-
-
-def build_output_path(output_dir: str, collection_pid: str) -> Path:
-    """
-    Builds the output file path for the collection activity report.
-
-    Called by: main()
-    """
-    safe_collection_pid: str = collection_pid.replace(':', '_')
-    output_path: Path = Path(output_dir).expanduser().resolve() / f'collection_activity__{safe_collection_pid}.json'
-    return output_path
 
 
 def build_search_params(collection_pid: str, start: int, rows: int) -> dict[str, str | int]:
@@ -234,10 +222,9 @@ def build_output_data(
     collection_title: str | None,
     num_found: int,
     aggregate_data: dict[str, Any],
-    output_path: Path,
 ) -> dict[str, Any]:
     """
-    Builds the final pretty-printable JSON payload for disk output.
+    Builds the final pretty-printable JSON payload for stdout output.
 
     Called by: main()
     """
@@ -252,21 +239,21 @@ def build_output_data(
             'num_found': num_found,
             'items_counted': aggregate_data['items_counted'],
             'items_skipped': aggregate_data['items_skipped'],
-            'output_file': str(output_path),
+            'http_calls': aggregate_data['http_calls'],
         },
         'monthly_counts': aggregate_data['monthly_counts'],
     }
     return output_data
 
 
-def write_output_file(output_path: Path, output_data: dict[str, Any]) -> None:
+def finalize_aggregate_data(aggregate_data: dict[str, Any], http_call_count: int) -> dict[str, Any]:
     """
-    Writes the output JSON to disk with stable pretty-print formatting.
+    Adds final run metadata derived after HTTP activity completes.
 
     Called by: main()
     """
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(output_data, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+    aggregate_data['http_calls'] = http_call_count
+    return aggregate_data
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -275,9 +262,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     Called by: main()
     """
-    parser = argparse.ArgumentParser(description='Write monthly BDR collection activity counts to a JSON file.')
+    parser = argparse.ArgumentParser(description='Print monthly BDR collection activity counts as formatted JSON.')
     parser.add_argument('--collection-pid', required=True, help='BDR collection PID, for example bdr:bwehb8b8')
-    parser.add_argument('--output-dir', required=True, help='Directory where the JSON report will be written')
     parser.add_argument('--rows', type=int, default=200, help='Search API page size')
     parsed_args: argparse.Namespace = parser.parse_args(argv)
     return parsed_args
@@ -285,12 +271,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     """
-    Orchestrates collection activity retrieval, aggregation, and file output.
+    Orchestrates collection activity retrieval, aggregation, and stdout output.
 
     Called by: dundermain
     """
     args: argparse.Namespace = parse_args(argv)
-    output_path: Path = build_output_path(args.output_dir, args.collection_pid)
     headers: dict[str, str] = {'Accept': 'application/json'}
     transport = httpx.HTTPTransport(retries=2)
     http_call_count: dict[str, int] = {'count': 0}
@@ -300,16 +285,14 @@ def main(argv: list[str] | None = None) -> int:
         num_found, docs = iter_collection_docs(client, args.collection_pid, args.rows, http_call_count)
 
     aggregate_data: dict[str, Any] = aggregate_monthly_counts(docs)
+    aggregate_data = finalize_aggregate_data(aggregate_data, http_call_count['count'])
     output_data: dict[str, Any] = build_output_data(
         collection_pid=args.collection_pid,
         collection_title=collection_title,
         num_found=num_found,
         aggregate_data=aggregate_data,
-        output_path=output_path,
     )
-    write_output_file(output_path, output_data)
     print(json.dumps(output_data, indent=2, ensure_ascii=False))
-    print(f'http_calls: {http_call_count["count"]}')
     return 0
 
 
