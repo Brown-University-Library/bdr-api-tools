@@ -133,6 +133,44 @@ Suggested top-level shape:
    - output filename/path generation
 4. Run `uv run ./run_tests.py` and, if helpful, a direct script smoke test against a real collection.
 
+## Cross-Session Context / Handoff Notes
+
+- This repository expects runnable standalone scripts at the repo root, with `uv` inline script metadata at the very top of each script file.
+- Existing examples most relevant to this task are:
+  - `calc_collection_size.py` for collection-scoped Search API pagination and optional Collection API title lookup
+  - `show_zip_info.py` for pretty-printed JSON output structure
+- The intended invocation style for the new tool is remote-friendly:
+  - `uv run https://brown-university-library.github.io/bdr-api-tools/display_collection_activity.py --collection-pid bdr:bwehb8b8 --output-dir '/path/to/output-dir/'`
+- The implementation should therefore avoid local-package assumptions and keep dependencies minimal; `httpx` is the expected HTTP library.
+- `AGENTS.md` is the source of truth for coding directives in this repo. Key requirements for implementation:
+  - Python 3.12 type hints throughout
+  - simple `main()` that only orchestrates
+  - no nested functions
+  - triple-quoted present-tense docstrings
+  - docstrings should end with a `Called by:` line
+- `ruff.toml` confirms:
+  - max line length of `125`
+  - single-quote formatting style
+- A likely first-pass implementation strategy is:
+  - fetch collection title from Collection API
+  - fetch paginated collection members from Search API
+  - inspect one or more date fields on each doc
+  - normalize usable dates to `YYYY-MM`
+  - count per month
+  - write a single pretty-printed JSON file into `--output-dir`
+- Important unresolved implementation detail:
+  - the exact Search API field that best represents when an item was added to a collection has not yet been confirmed
+  - if no reliable search-result field exists, a fallback to Item API may be required, but that should be treated as a second-choice approach because it increases request volume
+- The BDR API wiki mentions Cloudflare bot protection, so implementation should stay conservative:
+  - use synchronous requests
+  - reuse an `httpx.Client`
+  - avoid excessive page sizes or unnecessary follow-up requests
+- The output format currently planned is:
+  - top-level `_meta_` block with run metadata and counts
+  - top-level `monthly_counts` mapping keyed by `YYYY-MM`
+- The plan currently assumes one output file per run, written to `--output-dir`, with a predictable filename such as `collection_activity__bdr_bwehb8b8.json`.
+- If implementation resumes later, a good first validation step is to inspect live Search API responses for one representative collection and identify which date field is populated consistently enough to support month bucketing.
+
 ## Code Structure Notes
 
 Note: be sure to review `bdr-api-tools/AGENTS.md` for coding-directives to follow.
