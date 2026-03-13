@@ -26,14 +26,8 @@ import httpx
 
 SEARCH_BASE = 'https://repository.library.brown.edu/api/search/'
 COLLECTION_API_TEMPLATE = 'https://repository.library.brown.edu/api/collections/{collection_pid}/'
-DATE_FIELD_CANDIDATES: list[str] = [
-    'dateCreated',
-    'dateIssued',
-    'dateModified',
-    'dateUploaded',
-    'pub_date',
-]
-SEARCH_FIELDS: list[str] = ['pid', *DATE_FIELD_CANDIDATES]
+DATE_FIELD = 'deposit_date'
+SEARCH_FIELDS: list[str] = ['pid', DATE_FIELD]
 MONTH_PATTERN = re.compile(r'^(\d{4})-(\d{2})')
 
 
@@ -148,22 +142,19 @@ def iter_candidate_values(raw_value: Any) -> list[Any]:
 
 def choose_month_from_doc(doc: dict[str, Any]) -> tuple[str | None, str | None]:
     """
-    Chooses the first usable month string from the configured date fields in a search doc.
+    Chooses a usable month string from the deposit_date field in a search doc.
 
     Called by: aggregate_monthly_counts()
     """
     chosen_month: str | None = None
     chosen_field: str | None = None
+    raw_value: Any = doc.get(DATE_FIELD)
 
-    for field_name in DATE_FIELD_CANDIDATES:
-        raw_value: Any = doc.get(field_name)
-        for candidate_value in iter_candidate_values(raw_value):
-            normalized_month: str | None = normalize_date_value(candidate_value)
-            if normalized_month is not None:
-                chosen_month = normalized_month
-                chosen_field = field_name
-                break
-        if chosen_month is not None:
+    for candidate_value in iter_candidate_values(raw_value):
+        normalized_month: str | None = normalize_date_value(candidate_value)
+        if normalized_month is not None:
+            chosen_month = normalized_month
+            chosen_field = DATE_FIELD
             break
 
     return chosen_month, chosen_field

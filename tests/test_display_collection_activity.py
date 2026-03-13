@@ -2,10 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from display_collection_activity import aggregate_monthly_counts
-from display_collection_activity import build_output_path
-from display_collection_activity import normalize_date_value
-from display_collection_activity import write_output_file
+from display_collection_activity import aggregate_monthly_counts, build_output_path, normalize_date_value, write_output_file
 
 
 class TestNormalizeDateValue(unittest.TestCase):
@@ -38,9 +35,9 @@ class TestAggregateMonthlyCounts(unittest.TestCase):
         Checks aggregation correctness across multiple documents.
         """
         docs = [
-            {'pid': 'bdr:1', 'dateCreated': '2024-11-03T12:00:00Z'},
-            {'pid': 'bdr:2', 'dateCreated': '2024-11-20'},
-            {'pid': 'bdr:3', 'dateCreated': '2024-12-01'},
+            {'pid': 'bdr:1', 'deposit_date': '2024-11-03T12:00:00Z'},
+            {'pid': 'bdr:2', 'deposit_date': '2024-11-20'},
+            {'pid': 'bdr:3', 'deposit_date': '2024-12-01'},
         ]
 
         result = aggregate_monthly_counts(docs)
@@ -48,26 +45,27 @@ class TestAggregateMonthlyCounts(unittest.TestCase):
         self.assertEqual(result['monthly_counts'], {'2024-11': 2, '2024-12': 1})
         self.assertEqual(result['items_counted'], 3)
         self.assertEqual(result['items_skipped'], 0)
-        self.assertEqual(result['date_field_used'], 'dateCreated')
-        self.assertEqual(result['date_fields_used'], ['dateCreated'])
+        self.assertEqual(result['date_field_used'], 'deposit_date')
+        self.assertEqual(result['date_fields_used'], ['deposit_date'])
 
-    def test_skips_docs_without_usable_dates_and_uses_fallback_field(self):
+    def test_skips_docs_without_usable_deposit_dates(self):
         """
-        Checks skip behavior when some docs have no usable date and another candidate field is used.
+        Checks skip behavior when some docs have no usable deposit date.
         """
         docs = [
-            {'pid': 'bdr:1', 'dateCreated': None, 'dateIssued': '2023-01-10'},
-            {'pid': 'bdr:2', 'dateCreated': 'bad-value', 'dateIssued': ['2023-01-15', '2023-02-01']},
-            {'pid': 'bdr:3', 'dateCreated': None, 'dateIssued': None},
+            {'pid': 'bdr:1', 'deposit_date': '2023-01-10'},
+            {'pid': 'bdr:2', 'deposit_date': ['2023-01-15', '2023-02-01']},
+            {'pid': 'bdr:3', 'deposit_date': None, 'dateCreated': '2023-01-20'},
+            {'pid': 'bdr:4', 'deposit_date': 'bad-value'},
         ]
 
         result = aggregate_monthly_counts(docs)
 
         self.assertEqual(result['monthly_counts'], {'2023-01': 2})
         self.assertEqual(result['items_counted'], 2)
-        self.assertEqual(result['items_skipped'], 1)
-        self.assertEqual(result['date_field_used'], 'dateIssued')
-        self.assertEqual(result['date_fields_used'], ['dateIssued'])
+        self.assertEqual(result['items_skipped'], 2)
+        self.assertEqual(result['date_field_used'], 'deposit_date')
+        self.assertEqual(result['date_fields_used'], ['deposit_date'])
 
 
 class TestOutputPathAndWriting(unittest.TestCase):
