@@ -1,3 +1,7 @@
+# Implementation Plan
+
+## Prompt
+
 Goal:
 
 - create a bdr-api-tool that can display collection-activity over time.
@@ -24,7 +28,6 @@ Tasks:
 
 - _after_ the plan is saved to disk, incorporate this prompt at the top of the plan.
 
-# Implementation Plan
 
 ## Objective
 
@@ -131,6 +134,8 @@ Suggested top-level shape:
 4. Run `uv run ./run_tests.py` and, if helpful, a direct script smoke test against a real collection.
 
 ## Code Structure Notes
+
+Note: be sure to review `bdr-api-tools/AGENTS.md` for coding-directives to follow.
 
 - Keep `main()` limited to argument parsing and orchestration.
 - Put HTTP operations in top-level helpers or a small class if that makes date-field evaluation cleaner.
