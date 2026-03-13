@@ -57,19 +57,40 @@ def build_search_params(collection_pid: str, start: int, rows: int) -> dict[str,
     return params
 
 
-def fetch_search_page(client: httpx.Client, collection_pid: str, start: int, rows: int) -> dict[str, Any]:
+def increment_http_call_count(http_call_count: dict[str, int]) -> None:
+    """
+    Increments the tracked HTTP call count.
+
+    Called by: fetch_search_page()
+    """
+    http_call_count['count'] += 1
+
+
+def fetch_search_page(
+    client: httpx.Client,
+    collection_pid: str,
+    start: int,
+    rows: int,
+    http_call_count: dict[str, int],
+) -> dict[str, Any]:
     """
     Fetches one page of search results for the given collection.
 
     Called by: iter_collection_docs()
     """
+    increment_http_call_count(http_call_count)
     response: httpx.Response = client.get(SEARCH_BASE, params=build_search_params(collection_pid, start, rows), timeout=30)
     response.raise_for_status()
     page_data: dict[str, Any] = response.json()
     return page_data
 
 
-def iter_collection_docs(client: httpx.Client, collection_pid: str, rows: int) -> tuple[int, list[dict[str, Any]]]:
+def iter_collection_docs(
+    client: httpx.Client,
+    collection_pid: str,
+    rows: int,
+    http_call_count: dict[str, int],
+) -> tuple[int, list[dict[str, Any]]]:
     """
     Fetches all collection search documents across paginated results.
 
@@ -80,7 +101,7 @@ def iter_collection_docs(client: httpx.Client, collection_pid: str, rows: int) -
     all_docs: list[dict[str, Any]] = []
 
     while True:
-        page_data: dict[str, Any] = fetch_search_page(client, collection_pid, start, rows)
+        page_data: dict[str, Any] = fetch_search_page(client, collection_pid, start, rows, http_call_count)
         response_data: dict[str, Any] = page_data.get('response', {})
         if start == 0:
             num_found = int(response_data.get('numFound', 0))
@@ -93,13 +114,14 @@ def iter_collection_docs(client: httpx.Client, collection_pid: str, rows: int) -
     return num_found, all_docs
 
 
-def fetch_collection_title(client: httpx.Client, collection_pid: str) -> str | None:
+def fetch_collection_title(client: httpx.Client, collection_pid: str, http_call_count: dict[str, int]) -> str | None:
     """
     Fetches the collection title from the collection API.
 
     Called by: main()
     """
     url: str = COLLECTION_API_TEMPLATE.format(collection_pid=collection_pid)
+    increment_http_call_count(http_call_count)
     response: httpx.Response = client.get(url, timeout=30)
     title: str | None = None
     if response.status_code != 403:
@@ -271,10 +293,11 @@ def main(argv: list[str] | None = None) -> int:
     output_path: Path = build_output_path(args.output_dir, args.collection_pid)
     headers: dict[str, str] = {'Accept': 'application/json'}
     transport = httpx.HTTPTransport(retries=2)
+    http_call_count: dict[str, int] = {'count': 0}
 
     with httpx.Client(headers=headers, transport=transport) as client:
-        collection_title: str | None = fetch_collection_title(client, args.collection_pid)
-        num_found, docs = iter_collection_docs(client, args.collection_pid, args.rows)
+        collection_title: str | None = fetch_collection_title(client, args.collection_pid, http_call_count)
+        num_found, docs = iter_collection_docs(client, args.collection_pid, args.rows, http_call_count)
 
     aggregate_data: dict[str, Any] = aggregate_monthly_counts(docs)
     output_data: dict[str, Any] = build_output_data(
@@ -286,6 +309,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     write_output_file(output_path, output_data)
     print(json.dumps(output_data, indent=2, ensure_ascii=False))
+    print(f'http_calls: {http_call_count["count"]}')
     return 0
 
 
