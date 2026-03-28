@@ -85,7 +85,7 @@ class TestBuildCollectionTitle(unittest.TestCase):
 
         result = build_collection_title(collection_data)
 
-        self.assertEqual(result, 'Theses and Dissertations -- (from Computer Science)')
+        self.assertEqual(result, '`Theses and Dissertations` -- (from parent-collection `Computer Science`)')
 
     def test_builds_title_with_undetermined_parent_suffix_when_missing(self):
         """
@@ -98,7 +98,7 @@ class TestBuildCollectionTitle(unittest.TestCase):
 
         result = build_collection_title(collection_data)
 
-        self.assertEqual(result, 'Theses and Dissertations -- (parent collection-title undetermined)')
+        self.assertEqual(result, 'Theses and Dissertations')
 
 
 if __name__ == '__main__':

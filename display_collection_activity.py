@@ -139,9 +139,9 @@ def build_collection_title(collection_data: dict[str, Any]) -> str | None:
 
     if base_title:
         if parent_title:
-            derived_title = f'{base_title} -- (from {parent_title})'
+            derived_title = f'`{base_title}` -- (from parent-collection `{parent_title}`)'
         else:
-            derived_title = f'{base_title} -- (parent collection-title undetermined)'
+            derived_title = base_title
 
     return derived_title
 
