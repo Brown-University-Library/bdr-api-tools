@@ -115,8 +115,35 @@ def fetch_collection_title(client: httpx.Client, collection_pid: str, http_call_
     if response.status_code != 403:
         response.raise_for_status()
         collection_data: dict[str, Any] = response.json()
-        title = collection_data.get('name') or collection_data.get('primary_title')
+        title = build_collection_title(collection_data)
     return title
+
+
+def build_collection_title(collection_data: dict[str, Any]) -> str | None:
+    """
+    Builds a display-ready collection title with parent collection provenance.
+
+    Called by: fetch_collection_title()
+    """
+    base_title: str = collection_data.get('name') or collection_data.get('primary_title') or ''
+    parent_title: str = ''
+    ancestors: Any = collection_data.get('ancestors')
+    derived_title: str | None = None
+
+    if isinstance(ancestors, list) and ancestors:
+        last_ancestor: Any = ancestors[-1]
+        if isinstance(last_ancestor, dict):
+            parent_title = last_ancestor.get('name') or last_ancestor.get('title') or ''
+        elif isinstance(last_ancestor, str):
+            parent_title = last_ancestor
+
+    if base_title:
+        if parent_title:
+            derived_title = f'{base_title} -- (from {parent_title})'
+        else:
+            derived_title = f'{base_title} -- (parent collection-title undetermined)'
+
+    return derived_title
 
 
 def normalize_date_value(raw_value: Any) -> str | None:

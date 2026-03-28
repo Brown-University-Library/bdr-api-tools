@@ -1,6 +1,6 @@
 import unittest
 
-from display_collection_activity import aggregate_monthly_counts, normalize_date_value
+from display_collection_activity import aggregate_monthly_counts, build_collection_title, normalize_date_value
 
 
 class TestNormalizeDateValue(unittest.TestCase):
@@ -64,6 +64,41 @@ class TestAggregateMonthlyCounts(unittest.TestCase):
         self.assertEqual(result['items_skipped'], 2)
         self.assertEqual(result['date_field_used'], 'deposit_date')
         self.assertEqual(result['date_fields_used'], ['deposit_date'])
+
+
+class TestBuildCollectionTitle(unittest.TestCase):
+    """
+    Tests collection title formatting behavior.
+    """
+
+    def test_builds_title_with_parent_collection_name(self):
+        """
+        Checks parent-aware title formatting when the collection JSON includes an ancestor name.
+        """
+        collection_data = {
+            'name': 'Theses and Dissertations',
+            'ancestors': [
+                {'name': 'Library Collections'},
+                {'name': 'Computer Science'},
+            ],
+        }
+
+        result = build_collection_title(collection_data)
+
+        self.assertEqual(result, 'Theses and Dissertations -- (from Computer Science)')
+
+    def test_builds_title_with_undetermined_parent_suffix_when_missing(self):
+        """
+        Checks fallback title formatting when no parent collection title can be derived.
+        """
+        collection_data = {
+            'name': 'Theses and Dissertations',
+            'ancestors': [],
+        }
+
+        result = build_collection_title(collection_data)
+
+        self.assertEqual(result, 'Theses and Dissertations -- (parent collection-title undetermined)')
 
 
 if __name__ == '__main__':
