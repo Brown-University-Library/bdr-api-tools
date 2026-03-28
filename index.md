@@ -104,7 +104,7 @@ Output (excerpt):
 ```
 {
   "_meta_": {
-    "timestamp": "2026-03-13T07:37:00-04:00",
+    "timestamp": "2026-03-28T11:56:15.128444-04:00",
     "collection_pid": "bdr:bwehb8b8",
     "collection_title": "Brown University Open Data Collection",
     "search_url": "https://repository.library.brown.edu/api/search/",
@@ -112,15 +112,35 @@ Output (excerpt):
     "date_fields_used": [
       "deposit_date"
     ],
-    "num_found": 908,
-    "items_counted": 901,
-    "items_skipped": 7,
+    "num_found": 971,
+    "items_counted": 971,
+    "items_skipped": 0,
     "http_calls": 6
   },
   "monthly_counts": {
-    "2021-11": 3,
-    "2021-12": 8,
-    "2022-01": 12
+    "2013-08": 1,
+    "2014-05": 1,
+    "2014-10": 1,
+    "2015-01": 1,
+    "2015-04": 1,
+    "2015-07": 1,
+    "2015-11": 3,
+	--snip--
+    "2025-01": 14,
+    "2025-02": 7,
+    "2025-03": 6,
+    "2025-04": 22,
+    "2025-05": 6,
+    "2025-06": 10,
+    "2025-07": 4,
+    "2025-08": 4,
+    "2025-09": 6,
+    "2025-10": 6,
+    "2025-11": 3,
+    "2025-12": 2,
+    "2026-01": 3,
+    "2026-02": 43,
+    "2026-03": 1
   }
 }
 ```
