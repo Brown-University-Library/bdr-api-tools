@@ -14,6 +14,7 @@ For Brown community members, a recommendation: if you're off-campus, enable [Bro
 ## tools listing
 
 - calc_collection_size.py ([brief](#calc_collection_sizepy-brief)), ([detailed](#calc_collection_sizepy-detailed))
+- display_collection_activity.py ([brief](#display_collection_activitypy-brief)), ([detailed](#display_collection_activitypy-detailed))
 - gather_extracted_text.py ([brief](#gather_extracted_textpy-brief)), ([detailed](#gather_extracted_textpy-detailed))
 - list_named_entities.py ([brief](#list_named_entitiespy-brief)), ([detailed](#list_named_entitiespy-detailed))
 - show_zip_info.py ([brief](#show_zip_infopy-brief)), ([detailed](#show_zip_infopy-detailed))
@@ -27,6 +28,12 @@ For Brown community members, a recommendation: if you're off-campus, enable [Bro
 ### calc_collection_size.py (brief)
 
 Calculates the total storage size of all items in the given BDR collection. It queries the Search API with pagination to retrieve and process the necessary data, and prints a summary including a human-readable size. It gets the collection title via the Collections API. 
+
+---
+
+### display_collection_activity.py (brief)
+
+Displays monthly BDR collection activity counts as formatted JSON. It queries the Search API for collection members, buckets items by `deposit_date` month, and includes summary metadata such as collection title, counts of counted and skipped items, and HTTP-call totals.
 
 ---
 
@@ -76,6 +83,69 @@ Human: 239.49 GB
 ```
 
 [Code](https://github.com/Brown-University-Library/bdr-api-tools/blob/main/calc_collection_size.py)
+
+---
+
+
+### display_collection_activity.py (detailed)
+
+Displays monthly BDR collection activity counts as formatted JSON. It queries the Search API for all items in the given collection, extracts the `deposit_date` field from each result when possible, normalizes that to `YYYY-MM`, and counts items per month.
+
+The script also looks up the collection title via the Collections API for inclusion in the `_meta_` section. Items without a usable `deposit_date` value are skipped and reported in the output metadata. The JSON is pretty-printed and printed to stdout. The total number of HTTP calls made is included in the `_meta_` block.
+
+Args: --collection-pid (required), --rows (optional).
+
+Example usage:
+```
+uv run https://brown-university-library.github.io/bdr-api-tools/display_collection_activity.py --collection-pid bdr:bwehb8b8
+```
+
+Output (excerpt):
+```
+{
+  "_meta_": {
+    "timestamp": "2026-03-28T11:56:15.128444-04:00",
+    "collection_pid": "bdr:bwehb8b8",
+    "collection_title": "Brown University Open Data Collection",
+    "search_url": "https://repository.library.brown.edu/api/search/",
+    "date_field_used": "deposit_date",
+    "date_fields_used": [
+      "deposit_date"
+    ],
+    "num_found": 971,
+    "items_counted": 971,
+    "items_skipped": 0,
+    "http_calls": 6
+  },
+  "monthly_counts": {
+    "2013-08": 1,
+    "2014-05": 1,
+    "2014-10": 1,
+    "2015-01": 1,
+    "2015-04": 1,
+    "2015-07": 1,
+    "2015-11": 3,
+	--snip--
+    "2025-01": 14,
+    "2025-02": 7,
+    "2025-03": 6,
+    "2025-04": 22,
+    "2025-05": 6,
+    "2025-06": 10,
+    "2025-07": 4,
+    "2025-08": 4,
+    "2025-09": 6,
+    "2025-10": 6,
+    "2025-11": 3,
+    "2025-12": 2,
+    "2026-01": 3,
+    "2026-02": 43,
+    "2026-03": 1
+  }
+}
+```
+
+[Code](https://github.com/Brown-University-Library/bdr-api-tools/blob/main/display_collection_activity.py)
 
 ---
 
