@@ -93,7 +93,7 @@ Displays monthly BDR collection activity counts as formatted JSON. It queries th
 
 The script also looks up the collection title via the Collections API for inclusion in the `_meta_` section. Items without a usable `deposit_date` value are skipped and reported in the output metadata. The JSON is pretty-printed and printed to stdout. The total number of HTTP calls made is included in the `_meta_` block.
 
-Args: --collection-pid (required), --rows (optional).
+Args: --collection-pid (required)
 
 Example usage:
 ```
@@ -115,7 +115,7 @@ Output (excerpt):
     "num_found": 971,
     "items_counted": 971,
     "items_skipped": 0,
-    "http_calls": 6
+    "http_calls": 3
   },
   "monthly_counts": {
     "2013-08": 1,
