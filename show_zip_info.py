@@ -98,6 +98,8 @@ BDR_ITEM_API_TEMPLATE = 'https://repository.library.brown.edu/api/items/{pid}/'
 def build_item_url(pid: str) -> str:
     """
     Builds item url.
+
+    Called by: `fetch_item_json()`, `parse_item_zip_info()`.
     """
     return BDR_ITEM_API_TEMPLATE.format(pid=pid)
 
@@ -105,6 +107,8 @@ def build_item_url(pid: str) -> str:
 def fetch_item_json(client: httpx.Client, item_pid: str) -> dict[str, Any]:
     """
     Fetches item json from bdr api.
+
+    Called by: `main()`.
     """
     url = build_item_url(item_pid)
     resp = client.get(url, timeout=httpx.Timeout(15.0))
@@ -115,6 +119,8 @@ def fetch_item_json(client: httpx.Client, item_pid: str) -> dict[str, Any]:
 def ext_from_path(p: str) -> str:
     """
     Extracts the lowercase file extension from a path. If none, returns 'noext'.
+
+    Called by: `parse_item_zip_info()`.
     """
     name = (p or '').rsplit('/', 1)[-1]
     # treat everything after last '.' as extension; lowercase it
@@ -133,6 +139,8 @@ def parse_item_zip_info(
     - looks for top-level 'zip_filelist_ssim'
     - looks for children under either top-level 'hasPart' or 'relations' -> 'hasPart'
     - for each child pid, fetches the child's JSON and extracts its 'zip_filelist_ssim'
+
+    Called by: `main()`.
     """
     pid = str(item_json.get('pid', ''))
     item_zip_info: list[str] = list(item_json.get('zip_filelist_ssim', []) or [])
@@ -198,6 +206,8 @@ def parse_item_zip_info(
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """
     Parses cli args.
+
+    Called by: `main()`.
     """
     parser = argparse.ArgumentParser(description='Fetch BDR item and gather zip file lists for item and children.')
     parser.add_argument(
@@ -211,6 +221,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     """
     Manages main execution.
+
+    Called by: `sys.exit(main())` in the script entry point.
     """
     args = parse_args(argv)
 
