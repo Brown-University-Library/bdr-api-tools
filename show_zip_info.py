@@ -123,7 +123,7 @@ def ext_from_path(p: str) -> str:
     Called by: `parse_item_zip_info()`.
     """
     name = (p or '').rsplit('/', 1)[-1]
-    # treat everything after last '.' as extension; lowercase it
+    ## treat everything after last '.' as extension; lowercase it
     if '.' in name:
         return name.rsplit('.', 1)[-1].lower()
     return 'noext'
@@ -145,7 +145,7 @@ def parse_item_zip_info(
     pid = str(item_json.get('pid', ''))
     item_zip_info: list[str] = list(item_json.get('zip_filelist_ssim', []) or [])
 
-    # support both shapes: top-level 'hasPart' OR nested under 'relations'
+    ## support both shapes: top-level 'hasPart' OR nested under 'relations'
     has_part = item_json.get('hasPart')
     if has_part is None:
         has_part = (item_json.get('relations') or {}).get('hasPart')
@@ -169,17 +169,17 @@ def parse_item_zip_info(
                     }
                 )
 
-    # build item-level zip summary (by file extension)
+    ## build item-level zip summary (by file extension)
     ext_counts = Counter(ext_from_path(p) for p in item_zip_info)
     item_zip_filetype_summary = {ext: ext_counts[ext] for ext in sorted(ext_counts.keys())}
 
-    # add per-child summaries
+    ## add per-child summaries
     for child in has_parts_info:
         cz_list = child.get('child_zip_info', [])
         c_counts = Counter(ext_from_path(p) for p in cz_list)
         child['child_zip_filetype_summary'] = {ext: c_counts[ext] for ext in sorted(c_counts.keys())}
 
-    # build overall summary (item + all children)
+    ## build overall summary (item + all children)
     overall_counts = Counter(ext_counts)
     for child in has_parts_info:
         c_summary = child.get('child_zip_filetype_summary', {})
@@ -226,25 +226,25 @@ def main(argv: list[str] | None = None) -> int:
     """
     args = parse_args(argv)
 
-    # build an httpx client for connection reuse
+    ## build an httpx client for connection reuse
     headers = {
-        # leave open for future auth, custom UA, etc.
+        ## leave open for future auth, custom UA, etc.
         'User-Agent': 'bdr-zip-info/1.0 (+https://repository.library.brown.edu/)',
     }
     transport = httpx.HTTPTransport(retries=2)
     with httpx.Client(headers=headers, transport=transport) as client:
-        # fetch parent
+        ## fetch parent
         parent_json = fetch_item_json(client, args.item_pid)
 
-        # parse parent + children
+        ## parse parent + children
         fetcher = functools.partial(fetch_item_json, client)
         result = parse_item_zip_info(parent_json, fetcher)
 
-    # print the final structure as JSON
+    ## print the final structure as JSON
     try:
         print(json.dumps(result, indent=2, ensure_ascii=False))
     except Exception:
-        # last-resort repr so failures never mask core logic
+        ## last-resort repr so failures never mask core logic
         print(result)
 
     return 0
