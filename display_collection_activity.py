@@ -28,6 +28,7 @@ COLLECTION_API_TEMPLATE = 'https://repository.library.brown.edu/api/collections/
 DATE_FIELD = 'deposit_date'
 SEARCH_FIELDS: list[str] = ['pid', DATE_FIELD]
 MONTH_PATTERN = re.compile(r'^(\d{4})-(\d{2})')
+ROWS_PER_PAGE = 500
 
 
 def build_search_params(collection_pid: str, start: int, rows: int) -> dict[str, str | int]:
@@ -291,7 +292,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(description='Print monthly BDR collection activity counts as formatted JSON.')
     parser.add_argument('--collection-pid', required=True, help='BDR collection PID, for example bdr:bwehb8b8')
-    parser.add_argument('--rows', type=int, default=200, help='Search API page size')
     parsed_args: argparse.Namespace = parser.parse_args(argv)
     return parsed_args
 
@@ -309,7 +309,7 @@ def main(argv: list[str] | None = None) -> int:
 
     with httpx.Client(headers=headers, transport=transport) as client:
         collection_title: str | None = fetch_collection_title(client, args.collection_pid, http_call_count)
-        num_found, docs = iter_collection_docs(client, args.collection_pid, args.rows, http_call_count)
+        num_found, docs = iter_collection_docs(client, args.collection_pid, ROWS_PER_PAGE, http_call_count)
 
     aggregate_data: dict[str, Any] = aggregate_monthly_counts(docs)
     aggregate_data = finalize_aggregate_data(aggregate_data, http_call_count['count'])
