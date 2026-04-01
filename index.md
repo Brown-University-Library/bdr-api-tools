@@ -15,6 +15,7 @@ For Brown community members, a recommendation: if you're off-campus, enable [Bro
 
 - calc_collection_size.py ([brief](#calc_collection_sizepy-brief)), ([detailed](#calc_collection_sizepy-detailed))
 - display_collection_activity.py ([brief](#display_collection_activitypy-brief)), ([detailed](#display_collection_activitypy-detailed))
+- display_recent_activity.py ([brief](#display_recent_activitypy-brief)), ([detailed](#display_recent_activitypy-detailed))
 - gather_extracted_text.py ([brief](#gather_extracted_textpy-brief)), ([detailed](#gather_extracted_textpy-detailed))
 - list_named_entities.py ([brief](#list_named_entitiespy-brief)), ([detailed](#list_named_entitiespy-detailed))
 - show_zip_info.py ([brief](#show_zip_infopy-brief)), ([detailed](#show_zip_infopy-detailed))
@@ -34,6 +35,12 @@ Calculates the total storage size of all items in the given BDR collection. It q
 ### display_collection_activity.py (brief)
 
 Displays monthly BDR collection activity counts as formatted JSON. It queries the Search API for collection members, buckets items by `deposit_date` month, and includes summary metadata such as collection title, counts of counted and skipped items, and HTTP-call totals.
+
+---
+
+### display_recent_activity.py (brief)
+
+Displays recent repository activity as formatted JSON. It queries the Search API for the most recent items, lists those items with their collection memberships, and summarizes updated collections with counts for the recent-item set.
 
 ---
 
@@ -146,6 +153,58 @@ Output (excerpt):
 ```
 
 [Code](https://github.com/Brown-University-Library/bdr-api-tools/blob/main/display_collection_activity.py)
+
+---
+
+
+### display_recent_activity.py (detailed)
+
+Displays recent BDR repository activity as formatted JSON. It queries the Search API for the most recent items, tries a small set of candidate sort-fields until one works, and returns a recent-items list plus a per-collection summary for the same recent-item window.
+
+Each item in the output includes its PID, primary title, a best-available date field, and the collections it belongs to. The script also looks up collection titles via the Collections API so the collection-summary block is more readable. The `_meta_` section includes the requested item count, returned item count, chosen sort field, and total HTTP call count.
+
+Args: --recent-item-count (optional; defaults to 100)
+
+Example usage:
+```
+uv run https://brown-university-library.github.io/bdr-api-tools/display_recent_activity.py
+uv run https://brown-university-library.github.io/bdr-api-tools/display_recent_activity.py --recent-item-count 250
+```
+
+Output (excerpt):
+```
+{
+  "_meta_": {
+    "timestamp": "2026-04-01T16:20:00.000000-04:00",
+    "recent_item_count_requested": 100,
+    "recent_item_count_returned": 100,
+    "sort_field_used": "object_created_dsi desc",
+    "http_calls": 8
+  },
+  "recent_items": [
+    {
+      "pid": "bdr:123456",
+      "primary_title": "Example title",
+      "date_added": "2026-03-31T14:10:00Z",
+      "collections": [
+        {
+          "pid": "bdr:aaaaaa",
+          "name": "Theses and Dissertations -- (from Computer Science)"
+        }
+      ]
+    }
+  ],
+  "updated_collections": [
+    {
+      "collection_pid": "bdr:aaaaaa",
+      "collection_title": "Theses and Dissertations -- (from Computer Science)",
+      "recent_item_count": 40
+    }
+  ]
+}
+```
+
+[Code](https://github.com/Brown-University-Library/bdr-api-tools/blob/main/display_recent_activity.py)
 
 ---
 
