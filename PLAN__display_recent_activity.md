@@ -68,6 +68,12 @@ If 40 recently added theses appear in the result set, and those theses belong to
 }
 ```
 
+## Directives
+
+- review `bdr-api-tools/AGENTS.md` for coding-directives to follow.
+- review <https://github.com/Brown-University-Library/bdr_api_documentation/wiki> for information about the bdr-APIs.
+
+
 ## Notes
 
 - The exact script name can be adjusted, but `display_recent_activity.py` seems consistent with the existing naming style.
