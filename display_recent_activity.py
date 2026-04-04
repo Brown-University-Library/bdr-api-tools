@@ -265,7 +265,9 @@ def choose_title(data: dict[str, Any]) -> str:
     Called by: summarize_recent_doc()
     """
     title: str = ''
-    raw_title: Any = data.get('primary_title') or data.get('mods_title_full_primary_tsi') or data.get('name') or data.get('title')
+    raw_title: Any = (
+        data.get('primary_title') or data.get('mods_title_full_primary_tsi') or data.get('name') or data.get('title')
+    )
     if isinstance(raw_title, str):
         title = raw_title.strip()
     elif isinstance(raw_title, list) and raw_title:
@@ -738,9 +740,10 @@ def build_output_data(
             'item_api_template': ITEM_API_TEMPLATE,
             'collection_api_template': COLLECTION_API_TEMPLATE,
             'http_calls': http_call_count,
+            'note': 'Collection totals may exceed displayed items because an item may belong to multiple collections.',
         },
-        'recent_items': recent_items,
         'collection_summary': collection_summary,
+        'recent_items': recent_items,
         'skipped_items': skipped_items,
         'skipped_collections': skipped_collections,
     }
