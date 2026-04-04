@@ -790,7 +790,7 @@ def main(argv: list[str] | None = None) -> int:
             progress_reporter=progress_reporter,
         )
         recent_items: list[dict[str, Any]] = build_recent_items(docs)
-        progress_reporter.start_stage('Enrich', total=len(recent_items), detail='fetching item and collection details')
+        progress_reporter.start_stage('Processing', total=len(recent_items), detail='fetching item and collection details')
         enrichment_data: dict[str, Any] = enrich_recent_items_with_collections(
             client,
             recent_items,

@@ -159,7 +159,7 @@ Output (excerpt):
 
 ### display_recent_activity.py (detailed)
 
-Displays recent BDR repository activity as formatted JSON. It queries the Search API for the most recently added items, ordered by `deposit_date` descending, then enriches each item by calling the Item API to determine collection membership. For each collection represented in the recent item set, it calls the Collections API to derive a display-ready collection title and then outputs per-collection counts.
+Displays recent BDR repository activity as formatted JSON. It queries the Search API for the most recently added items, ordered by `deposit_date` descending, and asks that search response to include each item's collection membership. It then calls the Collections API once per unique collection represented in the recent item set to derive a display-ready collection title, including parent-collection context when available, and outputs per-collection counts.
 
 Args: --recent-items-count (optional; default `100`)
 
@@ -177,11 +177,19 @@ Output (excerpt):
     "items_returned": 100,
     "repository_items_found": 123456,
     "collections_counted": 4,
+    "note": "Collection totals may exceed displayed items because an item may belong to multiple collections.",
     "search_url": "https://repository.library.brown.edu/api/search/",
     "item_api_template": "https://repository.library.brown.edu/api/items/{item_pid}/",
     "collection_api_template": "https://repository.library.brown.edu/api/collections/{collection_pid}/",
-    "http_calls": 105
+    "http_calls": 5
   },
+  "collection_summary": [
+    {
+      "collection_pid": "bdr:bfttpwkj",
+      "collection_title": "`Theses and Dissertations` -- (from parent-collection `Computer Science`)",
+      "recent_item_count": 40
+    }
+  ],
   "recent_items": [
     {
       "pid": "bdr:123456",
@@ -193,13 +201,6 @@ Output (excerpt):
           "title": "`Theses and Dissertations` -- (from parent-collection `Computer Science`)"
         }
       ]
-    }
-  ],
-  "collection_summary": [
-    {
-      "collection_pid": "bdr:bfttpwkj",
-      "collection_title": "`Theses and Dissertations` -- (from parent-collection `Computer Science`)",
-      "recent_item_count": 40
     }
   ]
 }
