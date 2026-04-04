@@ -599,20 +599,15 @@ def enrich_recent_items_with_collections(
                 }
             )
         item['collections'] = collection_entries
-        item['collection_lookup_status'] = 'ok'
         if progress_reporter is not None:
             progress_reporter.update(
                 completed=index,
                 total=total_items,
-                detail=(
-                    f'current {item_pid}; unique collections {len(collection_title_cache)}; '
-                    'skipped items 0'
-                ),
+                detail=f'current {item_pid}; unique collections {len(collection_title_cache)}',
             )
 
     enrichment_data: dict[str, Any] = {
         'recent_items': recent_items,
-        'skipped_items': [],
         'skipped_collections': deduplicate_skipped_entries(skipped_collections, 'collection_pid'),
     }
     return enrichment_data
@@ -716,7 +711,6 @@ def build_output_data(
     recent_items: list[dict[str, Any]],
     collection_summary: list[dict[str, Any]],
     http_call_count: int,
-    skipped_items: list[dict[str, Any]],
     skipped_collections: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """
@@ -731,7 +725,6 @@ def build_output_data(
             'items_returned': len(recent_items),
             'repository_items_found': num_found,
             'collections_counted': len(collection_summary),
-            'items_skipped_forbidden': len(skipped_items),
             'collections_skipped_forbidden': len(skipped_collections),
             'search_url': SEARCH_BASE,
             'item_api_template': ITEM_API_TEMPLATE,
@@ -741,7 +734,6 @@ def build_output_data(
         },
         'collection_summary': collection_summary,
         'recent_items': recent_items,
-        'skipped_items': skipped_items,
         'skipped_collections': skipped_collections,
     }
     return output_data
@@ -808,14 +800,10 @@ def main(argv: list[str] | None = None) -> int:
         progress_reporter.finish(
             completed=len(recent_items),
             total=len(recent_items),
-            detail=(
-                f'unique collections {count_unique_collections(enrichment_data["recent_items"])}; '
-                f'skipped items {len(enrichment_data["skipped_items"])}'
-            ),
+            detail=f'unique collections {count_unique_collections(enrichment_data["recent_items"])}',
         )
 
     recent_items = enrichment_data['recent_items']
-    skipped_items: list[dict[str, Any]] = enrichment_data['skipped_items']
     skipped_collections: list[dict[str, Any]] = enrichment_data['skipped_collections']
     collection_summary: list[dict[str, Any]] = build_collection_summary(recent_items)
     output_data: dict[str, Any] = build_output_data(
@@ -824,7 +812,6 @@ def main(argv: list[str] | None = None) -> int:
         recent_items=recent_items,
         collection_summary=collection_summary,
         http_call_count=http_call_count['count'],
-        skipped_items=skipped_items,
         skipped_collections=skipped_collections,
     )
     print(json.dumps(output_data, indent=2, ensure_ascii=False))

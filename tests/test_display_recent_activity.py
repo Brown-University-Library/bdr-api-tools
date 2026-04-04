@@ -230,7 +230,6 @@ class TestEnrichRecentItemsWithCollections(unittest.TestCase):
 
         result = enrich_recent_items_with_collections(client, recent_items, http_call_count)
 
-        self.assertEqual(result['recent_items'][0]['collection_lookup_status'], 'ok')
         self.assertEqual(
             result['recent_items'][0]['collections'],
             [
@@ -238,10 +237,14 @@ class TestEnrichRecentItemsWithCollections(unittest.TestCase):
                 {'pid': 'bdr:beta2', 'title': 'Beta Collection'},
             ],
         )
-        self.assertEqual(result['recent_items'][1]['collections'], [{'pid': 'bdr:alpha1', 'title': '`Alpha Collection` -- (from parent-collection `Parent One`)'}])
-        self.assertEqual(result['skipped_items'], [])
+        self.assertEqual(
+            result['recent_items'][1]['collections'],
+            [{'pid': 'bdr:alpha1', 'title': '`Alpha Collection` -- (from parent-collection `Parent One`)'}],
+        )
+        self.assertNotIn('skipped_items', result)
         self.assertEqual(result['skipped_collections'], [])
         self.assertNotIn('__collection_pids', result['recent_items'][0])
+        self.assertNotIn('collection_lookup_status', result['recent_items'][0])
         self.assertEqual(http_call_count['count'], 2)
         client.close()
 
