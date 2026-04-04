@@ -246,6 +246,7 @@ def fetch_recent_docs(
     docs: list[dict[str, Any]] = []
     pages_fetched: int = 0
     total_pages: int | None = None
+    search_progress_started: bool = False
 
     while len(docs) < requested_count:
         rows: int = min(ROWS_PER_PAGE, requested_count - len(docs))
@@ -256,15 +257,18 @@ def fetch_recent_docs(
             num_found = int(response_data.get('numFound', 0))
             available_count: int = min(requested_count, num_found)
             total_pages = max(1, (available_count + ROWS_PER_PAGE - 1) // ROWS_PER_PAGE) if available_count else 1
+            if progress_reporter is not None and total_pages > 1:
+                progress_reporter.start_stage('Processing', total=total_pages, detail='searching recent items')
+                search_progress_started = True
         page_docs: list[dict[str, Any]] = list(response_data.get('docs', []))
         if not page_docs:
             break
         docs.extend(page_docs)
-        if progress_reporter is not None:
+        if progress_reporter is not None and search_progress_started:
             progress_reporter.update(
                 completed=pages_fetched,
                 total=total_pages,
-                detail=f'fetched {len(docs)}/{requested_count} requested items',
+                detail=f'search page {pages_fetched}/{total_pages}',
             )
         start += rows
         if start >= num_found:
