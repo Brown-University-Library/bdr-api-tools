@@ -165,7 +165,7 @@ Args: --recent-items-count (optional; default `100`), --progress (optional), --n
 
 Example usage:
 ```
-uv run https://brown-university-library.github.io/bdr-api-tools/display_recent_activity.py --recent-items-count 100
+uv run https://brown-university-library.github.io/bdr-api-tools/display_recent_activity.py --recent-items-count 20
 ```
 
 Output (excerpt):
@@ -174,9 +174,9 @@ Output (excerpt):
   "_meta_": {
     "timestamp": "2026-04-01T10:15:00.000000-04:00",
     "timetaken": "0:00:12.4",
-    "requested_recent_items_count": 100,
-    "items_returned": 100,
-    "repository_items_found": 123456,
+    "requested_recent_items_count": 20,
+    "items_returned": 20,
+    "repository_items_count": 123456,
     "collections_counted": 4,
     "note": "Collection totals may exceed displayed items because an item may belong to multiple collections.",
     "api_search_url": "https://repository.library.brown.edu/api/search/",
@@ -185,10 +185,11 @@ Output (excerpt):
   },
   "collection_summary": [
     {
-      "collection_pid": "bdr:bfttpwkj",
+      "collection_pid": "bdr:abcd",
       "collection_title": "`Theses and Dissertations` -- (from parent-collection `Computer Science`)",
-      "recent_item_count": 40
-    }
+      "recent_item_count": 15
+    },
+    --- snip ---
   ],
   "recent_items": [
     {
@@ -197,11 +198,12 @@ Output (excerpt):
       "deposit_date": "2026-03-31T14:05:00Z",
       "collections": [
         {
-          "pid": "bdr:bfttpwkj",
+          "pid": "bdr:wxyz",
           "title": "`Theses and Dissertations` -- (from parent-collection `Computer Science`)"
         }
       ]
-    }
+    },
+    --- snip ---
   ]
 }
 ```
