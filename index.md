@@ -176,7 +176,7 @@ Output (excerpt):
     "timetaken": "0:00:12.4",
     "requested_recent_items_count": 20,
     "items_returned": 20,
-    "repository_items_count": 123456,
+    "repository_items_count": "123_456",
     "collections_counted": 4,
     "note": "Collection totals may exceed displayed items because an item may belong to multiple collections.",
     "api_search_url": "https://repository.library.brown.edu/api/search/",

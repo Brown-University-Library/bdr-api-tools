@@ -12,6 +12,7 @@ from display_recent_activity import (
     enrich_recent_items_with_collections,
     format_duration,
     format_elapsed_timetaken,
+    format_integer_with_underscores,
     parse_args,
 )
 
@@ -281,6 +282,14 @@ class TestProgressHelpers(unittest.TestCase):
         result = format_elapsed_timetaken(3661.26)
 
         self.assertEqual(result, '1:01:01.3')
+
+    def test_formats_integer_with_underscores(self):
+        """
+        Checks integer display formatting with underscore separators.
+        """
+        result = format_integer_with_underscores(1234567)
+
+        self.assertEqual(result, '1_234_567')
 
 
 class TestParseArgs(unittest.TestCase):

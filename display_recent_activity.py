@@ -69,6 +69,16 @@ def format_elapsed_timetaken(seconds: float) -> str:
     return formatted_timetaken
 
 
+def format_integer_with_underscores(value: int) -> str:
+    """
+    Formats an integer with underscore thousands separators for display.
+
+    Called by: build_output_data()
+    """
+    formatted_value: str = f'{value:_}'
+    return formatted_value
+
+
 def build_progress_bar(completed: int, total: int, width: int = PROGRESS_BAR_WIDTH) -> str:
     """
     Builds a fixed-width ASCII progress bar.
@@ -633,7 +643,7 @@ def build_output_data(
             'timetaken': format_elapsed_timetaken(elapsed_seconds),
             'requested_recent_items_count': requested_count,
             'items_returned': len(recent_items),
-            'repository_items_count': num_found,
+            'repository_items_count': format_integer_with_underscores(num_found),
             'collections_counted': len(collection_summary),
             'collections_skipped_forbidden': len(skipped_collections),
             'api_search_url': SEARCH_BASE,
