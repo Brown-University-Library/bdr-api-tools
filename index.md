@@ -173,14 +173,14 @@ Output (excerpt):
 {
   "_meta_": {
     "timestamp": "2026-04-01T10:15:00.000000-04:00",
+    "timetaken": "0:00:12.4",
     "requested_recent_items_count": 100,
     "items_returned": 100,
     "repository_items_found": 123456,
     "collections_counted": 4,
     "note": "Collection totals may exceed displayed items because an item may belong to multiple collections.",
-    "search_url": "https://repository.library.brown.edu/api/search/",
-    "item_api_template": "https://repository.library.brown.edu/api/items/{item_pid}/",
-    "collection_api_template": "https://repository.library.brown.edu/api/collections/{collection_pid}/",
+    "api_search_url": "https://repository.library.brown.edu/api/search/",
+    "api_collection_template": "https://repository.library.brown.edu/api/collections/{collection_pid}/",
     "http_calls": 5
   },
   "collection_summary": [
