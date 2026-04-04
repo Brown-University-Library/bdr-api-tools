@@ -72,7 +72,7 @@ _(The "Args" usage examples don't show the optional `--help` flag, but it's avai
 
 Calculates the total storage size of all items in the given BDR collection. It queries the Search API to retrieve and process the necessary data, and prints a summary including a human-readable size. It also grabs the collection title via the Collections API. 
 
-Args: --collection-pid (required)
+Args: `--collection-pid` (required)
 
 Example usage:
 ```
@@ -100,7 +100,7 @@ Displays monthly BDR collection activity counts as formatted JSON. It queries th
 
 The script also looks up the collection title via the Collections API for inclusion in the `_meta_` section. Items without a usable `deposit_date` value are skipped and reported in the output metadata. The JSON is pretty-printed and printed to stdout. The total number of HTTP calls made is included in the `_meta_` block.
 
-Args: --collection-pid (required)
+Args: `--collection-pid` (required)
 
 Example usage:
 ```
@@ -161,7 +161,7 @@ Output (excerpt):
 
 Displays recent BDR repository activity as formatted JSON. It queries the Search API for the most recently added items, ordered by `deposit_date` descending, and asks that search response to include each item's collection membership. It then calls the Collections API once per unique collection represented in the recent item set to derive a display-ready collection title, including parent-collection context when available, and outputs per-collection counts.
 
-Args: --recent-items-count (optional; default `100`), --progress (optional), --no-progress (optional)
+Args: `--recent-items-count` (optional; default `100`), `--progress` (optional), `--no-progress` (optional)
 
 Example usage:
 ```
@@ -229,7 +229,7 @@ Because many collections with text are named "Theses and Dissertations", the col
 [snip]
 ```
 
-Args: --collection-pid (required), --output-dir (required), --test-limit (optional).
+Args: `--collection-pid` (required), `--output-dir` (required), `--test-limit` (optional).
 
 Example usage:
 ```
@@ -311,7 +311,7 @@ Not `cat`-ing the `extracted_text_for_collection_pid-bdr_bfttpwkj.txt` -- it con
 
 Runs [spaCy's](https://github.com/explosion/spaCy) named-entity-recognition ([NER](https://en.wikipedia.org/wiki/Named-entity_recognition)) on an item's extracted-text. Displays a unique alphabetical listing of all the entities found, with counts. Also displays a short-list of the most common entities, sorted by count (the full list can be calculated from the alphabetical listing). Includes a _meta_ section which includes a glossary, timestamp, time-taken, item-pid, item-title, and the version of spaCy used.
 
-Args: --item_pid (required).
+Args: `--item_pid` (required).
 
 Example usage:
 ```
@@ -506,7 +506,7 @@ Output (excerpt):
 
 Assembles data from the item-api and summarizes (based on extension) zip-file contents for the given item. It also lists, and summarizes, zip-file contents for all child-items. In addition to the per-item summary, it also summarizes the filetype counts across both parent and all child-items.
 
-Args: --item_pid (required).
+Args: `--item_pid` (required).
 
 Example usage:
 ```
