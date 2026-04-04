@@ -633,7 +633,7 @@ def build_output_data(
             'timetaken': format_elapsed_timetaken(elapsed_seconds),
             'requested_recent_items_count': requested_count,
             'items_returned': len(recent_items),
-            'repository_items_found': num_found,
+            'repository_items_count': num_found,
             'collections_counted': len(collection_summary),
             'collections_skipped_forbidden': len(skipped_collections),
             'api_search_url': SEARCH_BASE,
