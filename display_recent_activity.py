@@ -18,6 +18,7 @@ import argparse
 import json
 import re
 import sys
+import time
 from collections import Counter
 from datetime import datetime
 from typing import Any
@@ -32,6 +33,143 @@ ROWS_PER_PAGE = 500
 DEFAULT_RECENT_ITEMS_COUNT = 100
 SEARCH_FIELDS: list[str] = ['pid', 'primary_title', DATE_FIELD]
 PID_PATTERN = re.compile(r'^bdr:[A-Za-z0-9]+$')
+PROGRESS_BAR_WIDTH = 24
+
+
+def format_duration(seconds: float | None) -> str:
+    """
+    Formats a duration in seconds for compact progress display.
+
+    Called by: ProgressReporter.render_progress()
+    """
+    if seconds is None or seconds < 0:
+        return '?:??'
+
+    rounded_seconds: int = int(round(seconds))
+    minutes, seconds_part = divmod(rounded_seconds, 60)
+    hours, minutes_part = divmod(minutes, 60)
+    formatted_duration: str = f'{minutes_part:02d}:{seconds_part:02d}'
+    if hours > 0:
+        formatted_duration = f'{hours}:{minutes_part:02d}:{seconds_part:02d}'
+    return formatted_duration
+
+
+def build_progress_bar(completed: int, total: int, width: int = PROGRESS_BAR_WIDTH) -> str:
+    """
+    Builds a fixed-width ASCII progress bar.
+
+    Called by: ProgressReporter.render_progress()
+    """
+    if total < 1:
+        return '[' + ('-' * width) + ']'
+
+    filled_width: int = min(width, int((completed / total) * width))
+    progress_bar: str = '[' + ('#' * filled_width) + ('-' * (width - filled_width)) + ']'
+    return progress_bar
+
+
+class ProgressReporter:
+    """
+    Displays lightweight progress updates on stderr without affecting JSON stdout.
+
+    Called by: main()
+    """
+
+    def __init__(self, enabled: bool, stream: Any = None) -> None:
+        """
+        Initializes progress-display state for staged script output.
+
+        Called by: main()
+        """
+        self.enabled: bool = enabled
+        self.stream: Any = stream if stream is not None else sys.stderr
+        self.is_tty: bool = bool(getattr(self.stream, 'isatty', lambda: False)())
+        self.stage_name: str = ''
+        self.stage_total: int | None = None
+        self.stage_started_at: float | None = None
+        self.last_rendered_line_length: int = 0
+
+    def start_stage(self, stage_name: str, total: int | None = None, detail: str = '') -> None:
+        """
+        Starts a named stage and prints an initial progress line.
+
+        Called by: main()
+        """
+        if not self.enabled:
+            return
+
+        self.stage_name = stage_name
+        self.stage_total = total
+        self.stage_started_at = time.monotonic()
+        self.render_progress(0, total=total, detail=detail)
+
+    def update(self, completed: int, total: int | None = None, detail: str = '') -> None:
+        """
+        Updates the current stage display with fresh counters and timing.
+
+        Called by: fetch_recent_docs(), enrich_recent_items_with_collections()
+        """
+        if not self.enabled:
+            return
+
+        effective_total: int | None = total if total is not None else self.stage_total
+        self.render_progress(completed, total=effective_total, detail=detail)
+
+    def finish(self, completed: int | None = None, total: int | None = None, detail: str = '') -> None:
+        """
+        Completes the current stage and ends the progress line cleanly.
+
+        Called by: main()
+        """
+        if not self.enabled:
+            return
+
+        if completed is None:
+            completed = total if total is not None else self.stage_total
+        effective_total: int | None = total if total is not None else self.stage_total
+        self.render_progress(completed or 0, total=effective_total, detail=detail)
+        self.stream.write('\n')
+        self.stream.flush()
+        self.last_rendered_line_length = 0
+
+    def render_progress(self, completed: int, total: int | None = None, detail: str = '') -> None:
+        """
+        Renders the current progress line, including percent and ETA when possible.
+
+        Called by: ProgressReporter.start_stage(), ProgressReporter.update(), ProgressReporter.finish()
+        """
+        if not self.enabled:
+            return
+
+        elapsed_seconds: float | None = None
+        if self.stage_started_at is not None:
+            elapsed_seconds = time.monotonic() - self.stage_started_at
+
+        line: str = self.stage_name
+        if total is not None and total > 0:
+            eta_seconds: float | None = None
+            if completed > 0 and elapsed_seconds is not None:
+                remaining_units: int = max(total - completed, 0)
+                eta_seconds = (elapsed_seconds / completed) * remaining_units
+            percent_complete: int = min(100, int((completed / total) * 100))
+            line = (
+                f'{self.stage_name} {build_progress_bar(completed, total)} '
+                f'{completed}/{total} {percent_complete:3d}% '
+                f'elapsed {format_duration(elapsed_seconds)} eta {format_duration(eta_seconds)}'
+            )
+        elif elapsed_seconds is not None:
+            line = f'{self.stage_name} elapsed {format_duration(elapsed_seconds)}'
+
+        if detail:
+            line = f'{line} | {detail}'
+
+        if self.is_tty:
+            padded_line: str = line.ljust(self.last_rendered_line_length)
+            self.stream.write(f'\r{padded_line}')
+            self.last_rendered_line_length = len(line)
+        else:
+            self.stream.write(f'{line}\n')
+        self.stream.flush()
 
 
 def build_search_params(start: int, rows: int) -> dict[str, str | int]:
@@ -81,6 +219,7 @@ def fetch_recent_docs(
     client: httpx.Client,
     requested_count: int,
     http_call_count: dict[str, int],
+    progress_reporter: ProgressReporter | None = None,
 ) -> tuple[int, list[dict[str, Any]]]:
     """
     Fetches the most recent search docs up to the requested count.
@@ -90,17 +229,28 @@ def fetch_recent_docs(
     start: int = 0
     num_found: int = 0
     docs: list[dict[str, Any]] = []
+    pages_fetched: int = 0
+    total_pages: int | None = None
 
     while len(docs) < requested_count:
         rows: int = min(ROWS_PER_PAGE, requested_count - len(docs))
         page_data: dict[str, Any] = fetch_search_page(client, start, rows, http_call_count)
+        pages_fetched += 1
         response_data: dict[str, Any] = page_data.get('response', {})
         if start == 0:
             num_found = int(response_data.get('numFound', 0))
+            available_count: int = min(requested_count, num_found)
+            total_pages = max(1, (available_count + ROWS_PER_PAGE - 1) // ROWS_PER_PAGE) if available_count else 1
         page_docs: list[dict[str, Any]] = list(response_data.get('docs', []))
         if not page_docs:
             break
         docs.extend(page_docs)
+        if progress_reporter is not None:
+            progress_reporter.update(
+                completed=pages_fetched,
+                total=total_pages,
+                detail=f'fetched {len(docs)}/{requested_count} requested items',
+            )
         start += rows
         if start >= num_found:
             break
@@ -395,6 +545,7 @@ def enrich_recent_items_with_collections(
     client: httpx.Client,
     recent_items: list[dict[str, Any]],
     http_call_count: dict[str, int],
+    progress_reporter: ProgressReporter | None = None,
 ) -> dict[str, Any]:
     """
     Enriches recent items with collection membership and collection titles.
@@ -404,8 +555,9 @@ def enrich_recent_items_with_collections(
     collection_title_cache: dict[str, str | None] = {}
     skipped_items: list[dict[str, Any]] = []
     skipped_collections: list[dict[str, Any]] = []
+    total_items: int = len(recent_items)
 
-    for item in recent_items:
+    for index, item in enumerate(recent_items, start=1):
         item_pid: str = str(item.get('pid', '')).strip()
         try:
             item_json: dict[str, Any] = fetch_item_json(client, item_pid, http_call_count)
@@ -421,6 +573,15 @@ def enrich_recent_items_with_collections(
                         'status_code': 403,
                     }
                 )
+                if progress_reporter is not None:
+                    progress_reporter.update(
+                        completed=index,
+                        total=total_items,
+                        detail=(
+                            f'current {item_pid}; unique collections {len(collection_title_cache)}; '
+                            f'skipped items {len(skipped_items)}'
+                        ),
+                    )
                 continue
             raise
         collection_entries: list[dict[str, str | None]] = []
@@ -440,6 +601,15 @@ def enrich_recent_items_with_collections(
             )
         item['collections'] = collection_entries
         item['collection_lookup_status'] = 'ok'
+        if progress_reporter is not None:
+            progress_reporter.update(
+                completed=index,
+                total=total_items,
+                detail=(
+                    f'current {item_pid}; unique collections {len(collection_title_cache)}; '
+                    f'skipped items {len(skipped_items)}'
+                ),
+            )
 
     enrichment_data: dict[str, Any] = {
         'recent_items': recent_items,
@@ -526,6 +696,21 @@ def build_collection_summary(recent_items: list[dict[str, Any]]) -> list[dict[st
     return sort_collection_summary_rows(rows)
 
 
+def count_unique_collections(recent_items: list[dict[str, Any]]) -> int:
+    """
+    Counts distinct collection PIDs represented across recent items.
+
+    Called by: main()
+    """
+    unique_collection_pids: set[str] = set()
+    for item in recent_items:
+        for collection in item.get('collections', []):
+            collection_pid: str = str(collection.get('pid', '')).strip()
+            if collection_pid:
+                unique_collection_pids.add(collection_pid)
+    return len(unique_collection_pids)
+
+
 def build_output_data(
     requested_count: int,
     num_found: int,
@@ -575,6 +760,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=DEFAULT_RECENT_ITEMS_COUNT,
         help='Number of most recent repository items to include; defaults to 100',
     )
+    progress_group = parser.add_mutually_exclusive_group()
+    progress_group.add_argument(
+        '--progress',
+        action='store_true',
+        help='Show progress updates on stderr, even when stderr is not a TTY',
+    )
+    progress_group.add_argument(
+        '--no-progress',
+        action='store_true',
+        help='Suppress progress updates on stderr',
+    )
     parsed_args: argparse.Namespace = parser.parse_args(argv)
     if parsed_args.recent_items_count < 1:
         parser.error('--recent-items-count must be a positive integer')
@@ -585,17 +781,44 @@ def main(argv: list[str] | None = None) -> int:
     """
     Orchestrates recent-item retrieval, enrichment, aggregation, and stdout output.
 
-    Called by: dundermain
+    Called by: __main__
     """
     args: argparse.Namespace = parse_args(argv)
     headers: dict[str, str] = {'Accept': 'application/json'}
     transport = httpx.HTTPTransport(retries=2)
     http_call_count: dict[str, int] = {'count': 0}
+    progress_enabled: bool = args.progress or (not args.no_progress and sys.stderr.isatty())
+    progress_reporter = ProgressReporter(enabled=progress_enabled)
 
     with httpx.Client(headers=headers, transport=transport) as client:
-        num_found, docs = fetch_recent_docs(client, args.recent_items_count, http_call_count)
+        progress_reporter.start_stage('Search', detail='requesting recent items')
+        num_found, docs = fetch_recent_docs(
+            client,
+            args.recent_items_count,
+            http_call_count,
+            progress_reporter=progress_reporter,
+        )
+        progress_reporter.finish(
+            completed=1,
+            total=1,
+            detail=f'found {len(docs)} items from {num_found} repository matches',
+        )
         recent_items: list[dict[str, Any]] = build_recent_items(docs)
-        enrichment_data: dict[str, Any] = enrich_recent_items_with_collections(client, recent_items, http_call_count)
+        progress_reporter.start_stage('Enrich', total=len(recent_items), detail='fetching item and collection details')
+        enrichment_data: dict[str, Any] = enrich_recent_items_with_collections(
+            client,
+            recent_items,
+            http_call_count,
+            progress_reporter=progress_reporter,
+        )
+        progress_reporter.finish(
+            completed=len(recent_items),
+            total=len(recent_items),
+            detail=(
+                f'unique collections {count_unique_collections(enrichment_data["recent_items"])}; '
+                f'skipped items {len(enrichment_data["skipped_items"])}'
+            ),
+        )
 
     recent_items = enrichment_data['recent_items']
     skipped_items: list[dict[str, Any]] = enrichment_data['skipped_items']

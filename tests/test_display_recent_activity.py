@@ -5,9 +5,13 @@ import httpx
 from display_recent_activity import (
     build_collection_summary,
     build_collection_title,
+    build_progress_bar,
     choose_deposit_date,
+    count_unique_collections,
     enrich_recent_items_with_collections,
     extract_collection_pids,
+    format_duration,
+    parse_args,
 )
 
 
@@ -130,6 +134,30 @@ class TestBuildCollectionSummary(unittest.TestCase):
             ],
         )
 
+    def test_counts_unique_collections_across_recent_items(self):
+        """
+        Checks distinct-collection counting across repeated memberships.
+        """
+        recent_items = [
+            {
+                'pid': 'bdr:1',
+                'collections': [
+                    {'pid': 'bdr:col1', 'title': 'Collection One'},
+                    {'pid': 'bdr:col2', 'title': 'Collection Two'},
+                ],
+            },
+            {
+                'pid': 'bdr:2',
+                'collections': [
+                    {'pid': 'bdr:col1', 'title': 'Collection One'},
+                ],
+            },
+        ]
+
+        result = count_unique_collections(recent_items)
+
+        self.assertEqual(result, 2)
+
 
 class TestEnrichRecentItemsWithCollections(unittest.TestCase):
     """
@@ -202,6 +230,51 @@ class TestBuildCollectionTitle(unittest.TestCase):
         result = build_collection_title(collection_data)
 
         self.assertEqual(result, 'Datasets')
+
+
+class TestProgressHelpers(unittest.TestCase):
+    """
+    Tests progress-display helper behavior.
+    """
+
+    def test_formats_short_duration(self):
+        """
+        Checks minute-second formatting for short elapsed times.
+        """
+        result = format_duration(65)
+
+        self.assertEqual(result, '01:05')
+
+    def test_formats_long_duration(self):
+        """
+        Checks hour-aware formatting for longer elapsed times.
+        """
+        result = format_duration(3665)
+
+        self.assertEqual(result, '1:01:05')
+
+    def test_builds_progress_bar(self):
+        """
+        Checks ASCII progress-bar rendering at partial completion.
+        """
+        result = build_progress_bar(completed=3, total=4, width=8)
+
+        self.assertEqual(result, '[######--]')
+
+
+class TestParseArgs(unittest.TestCase):
+    """
+    Tests command-line argument parsing behavior.
+    """
+
+    def test_parses_progress_flag(self):
+        """
+        Checks parsing of the explicit progress-display flag.
+        """
+        parsed_args = parse_args(['--progress'])
+
+        self.assertTrue(parsed_args.progress)
+        self.assertFalse(parsed_args.no_progress)
 
 
 if __name__ == '__main__':
