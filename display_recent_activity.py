@@ -29,9 +29,10 @@ SEARCH_BASE = 'https://repository.library.brown.edu/api/search/'
 ITEM_API_TEMPLATE = 'https://repository.library.brown.edu/api/items/{item_pid}/'
 COLLECTION_API_TEMPLATE = 'https://repository.library.brown.edu/api/collections/{collection_pid}/'
 DATE_FIELD = 'deposit_date'
+COLLECTION_MEMBERSHIP_FIELD = 'rel_is_member_of_collection_ssim'
 ROWS_PER_PAGE = 500
 DEFAULT_RECENT_ITEMS_COUNT = 100
-SEARCH_FIELDS: list[str] = ['pid', 'primary_title', DATE_FIELD]
+SEARCH_FIELDS: list[str] = ['pid', 'primary_title', DATE_FIELD, COLLECTION_MEMBERSHIP_FIELD]
 PID_PATTERN = re.compile(r'^bdr:[A-Za-z0-9]+$')
 PROGRESS_BAR_WIDTH = 24
 
@@ -331,6 +332,7 @@ def summarize_recent_doc(doc: dict[str, Any]) -> dict[str, Any]:
         'pid': str(doc.get('pid', '')).strip(),
         'primary_title': choose_title(doc),
         'deposit_date': choose_deposit_date(doc),
+        '__collection_pids': choose_collection_pids(doc),
         'collections': [],
     }
     return item_summary
@@ -356,6 +358,26 @@ def fetch_item_json(client: httpx.Client, item_pid: str, http_call_count: dict[s
     response.raise_for_status()
     item_data: dict[str, Any] = response.json()
     return item_data
+
+
+def choose_collection_pids(doc: dict[str, Any]) -> list[str]:
+    """
+    Chooses collection membership PIDs from a search doc.
+
+    Called by: summarize_recent_doc()
+    """
+    collection_pids: list[str] = []
+    seen: set[str] = set()
+    raw_value: Any = doc.get(COLLECTION_MEMBERSHIP_FIELD)
+
+    for candidate_value in iter_candidate_values(raw_value):
+        if isinstance(candidate_value, str):
+            normalized_pid: str = candidate_value.strip()
+            if normalized_pid and PID_PATTERN.match(normalized_pid) and normalized_pid not in seen:
+                seen.add(normalized_pid)
+                collection_pids.append(normalized_pid)
+
+    return collection_pids
 
 
 def build_collection_url(collection_pid: str) -> str:
@@ -550,44 +572,19 @@ def enrich_recent_items_with_collections(
     progress_reporter: ProgressReporter | None = None,
 ) -> dict[str, Any]:
     """
-    Enriches recent items with collection membership and collection titles.
+    Enriches recent items with collection titles derived from collection PIDs.
 
     Called by: main()
     """
     collection_title_cache: dict[str, str | None] = {}
-    skipped_items: list[dict[str, Any]] = []
     skipped_collections: list[dict[str, Any]] = []
     total_items: int = len(recent_items)
 
     for index, item in enumerate(recent_items, start=1):
         item_pid: str = str(item.get('pid', '')).strip()
-        try:
-            item_json: dict[str, Any] = fetch_item_json(client, item_pid, http_call_count)
-        except httpx.HTTPStatusError as exc:
-            status_code: int | None = classify_http_status(exc)
-            if status_code == 403:
-                item['collections'] = []
-                item['collection_lookup_status'] = 'forbidden'
-                skipped_items.append(
-                    {
-                        'item_pid': item_pid,
-                        'reason': 'forbidden',
-                        'status_code': 403,
-                    }
-                )
-                if progress_reporter is not None:
-                    progress_reporter.update(
-                        completed=index,
-                        total=total_items,
-                        detail=(
-                            f'current {item_pid}; unique collections {len(collection_title_cache)}; '
-                            f'skipped items {len(skipped_items)}'
-                        ),
-                    )
-                continue
-            raise
         collection_entries: list[dict[str, str | None]] = []
-        for collection_pid in extract_collection_pids(item_json):
+        collection_pids: list[str] = item.pop('__collection_pids', [])
+        for collection_pid in collection_pids:
             collection_title: str | None = fetch_collection_title(
                 client=client,
                 collection_pid=collection_pid,
@@ -609,13 +606,13 @@ def enrich_recent_items_with_collections(
                 total=total_items,
                 detail=(
                     f'current {item_pid}; unique collections {len(collection_title_cache)}; '
-                    f'skipped items {len(skipped_items)}'
+                    'skipped items 0'
                 ),
             )
 
     enrichment_data: dict[str, Any] = {
         'recent_items': recent_items,
-        'skipped_items': skipped_items,
+        'skipped_items': [],
         'skipped_collections': deduplicate_skipped_entries(skipped_collections, 'collection_pid'),
     }
     return enrichment_data

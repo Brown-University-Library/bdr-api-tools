@@ -6,6 +6,7 @@ from display_recent_activity import (
     build_collection_summary,
     build_collection_title,
     build_progress_bar,
+    choose_collection_pids,
     choose_deposit_date,
     count_unique_collections,
     enrich_recent_items_with_collections,
@@ -78,6 +79,29 @@ class TestExtractCollectionPids(unittest.TestCase):
         result = extract_collection_pids(item_json)
 
         self.assertEqual(result, ['bdr:gamma3', 'bdr:delta4'])
+
+
+class TestChooseCollectionPids(unittest.TestCase):
+    """
+    Tests search-doc collection-membership extraction behavior.
+    """
+
+    def test_extracts_unique_collection_pids_from_search_doc(self):
+        """
+        Checks extraction from the search response collection-membership field.
+        """
+        doc = {
+            'rel_is_member_of_collection_ssim': [
+                'bdr:alpha1',
+                'bdr:beta2',
+                'bdr:alpha1',
+                '',
+            ]
+        }
+
+        result = choose_collection_pids(doc)
+
+        self.assertEqual(result, ['bdr:alpha1', 'bdr:beta2'])
 
 
 class TestBuildCollectionSummary(unittest.TestCase):
@@ -164,36 +188,61 @@ class TestEnrichRecentItemsWithCollections(unittest.TestCase):
     Tests recent-item enrichment behavior.
     """
 
-    def test_marks_item_as_skipped_when_item_api_is_forbidden(self):
+    def test_uses_cached_collection_lookups_for_search_derived_membership(self):
         """
-        Checks graceful continuation when an item API request returns 403.
+        Checks collection-title lookup reuse when membership comes from search docs.
         """
 
         def handler(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(status_code=403, request=request)
+            if request.url.path == '/api/collections/bdr:alpha1/':
+                return httpx.Response(
+                    status_code=200,
+                    request=request,
+                    json={'name': 'Alpha Collection', 'ancestors': [{'name': 'Parent One'}]},
+                )
+            if request.url.path == '/api/collections/bdr:beta2/':
+                return httpx.Response(
+                    status_code=200,
+                    request=request,
+                    json={'name': 'Beta Collection', 'ancestors': []},
+                )
+            return httpx.Response(status_code=404, request=request)
 
         transport = httpx.MockTransport(handler)
         client = httpx.Client(transport=transport)
         http_call_count = {'count': 0}
         recent_items = [
             {
-                'pid': 'bdr:blocked1',
-                'primary_title': 'Blocked Item',
+                'pid': 'bdr:item1',
+                'primary_title': 'Item One',
                 'deposit_date': '2026-03-31T00:00:00Z',
+                '__collection_pids': ['bdr:alpha1', 'bdr:beta2'],
+                'collections': [],
+            },
+            {
+                'pid': 'bdr:item2',
+                'primary_title': 'Item Two',
+                'deposit_date': '2026-03-30T00:00:00Z',
+                '__collection_pids': ['bdr:alpha1'],
                 'collections': [],
             }
         ]
 
         result = enrich_recent_items_with_collections(client, recent_items, http_call_count)
 
-        self.assertEqual(result['recent_items'][0]['collection_lookup_status'], 'forbidden')
-        self.assertEqual(result['recent_items'][0]['collections'], [])
+        self.assertEqual(result['recent_items'][0]['collection_lookup_status'], 'ok')
         self.assertEqual(
-            result['skipped_items'],
-            [{'item_pid': 'bdr:blocked1', 'reason': 'forbidden', 'status_code': 403}],
+            result['recent_items'][0]['collections'],
+            [
+                {'pid': 'bdr:alpha1', 'title': '`Alpha Collection` -- (from parent-collection `Parent One`)'},
+                {'pid': 'bdr:beta2', 'title': 'Beta Collection'},
+            ],
         )
+        self.assertEqual(result['recent_items'][1]['collections'], [{'pid': 'bdr:alpha1', 'title': '`Alpha Collection` -- (from parent-collection `Parent One`)'}])
+        self.assertEqual(result['skipped_items'], [])
         self.assertEqual(result['skipped_collections'], [])
-        self.assertEqual(http_call_count['count'], 1)
+        self.assertNotIn('__collection_pids', result['recent_items'][0])
+        self.assertEqual(http_call_count['count'], 2)
         client.close()
 
 
