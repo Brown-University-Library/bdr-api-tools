@@ -40,7 +40,7 @@ Displays monthly BDR collection activity counts as formatted JSON. It queries th
 
 ### display_recent_activity.py (brief)
 
-Displays the most recently added BDR items as formatted JSON, and summarizes which collections those items belong to. It queries the Search API for recent items, fetches item membership via the Item API, fetches collection titles via the Collections API, and reports per-collection counts.
+Displays the most recently added BDR items as formatted JSON, and summarizes which collections those items belong to. It queries the Search API for recent items and their collection membership, fetches collection titles via the Collections API once per unique collection, and reports per-collection counts.
 
 ---
 
@@ -161,7 +161,7 @@ Output (excerpt):
 
 Displays recent BDR repository activity as formatted JSON. It queries the Search API for the most recently added items, ordered by `deposit_date` descending, and asks that search response to include each item's collection membership. It then calls the Collections API once per unique collection represented in the recent item set to derive a display-ready collection title, including parent-collection context when available, and outputs per-collection counts.
 
-Args: --recent-items-count (optional; default `100`)
+Args: --recent-items-count (optional; default `100`), --progress (optional), --no-progress (optional)
 
 Example usage:
 ```
