@@ -12,6 +12,7 @@ from display_recent_activity import (
     enrich_recent_items_with_collections,
     extract_collection_pids,
     format_duration,
+    format_elapsed_timetaken,
     parse_args,
 )
 
@@ -312,6 +313,14 @@ class TestProgressHelpers(unittest.TestCase):
         result = build_progress_bar(completed=3, total=4, width=8)
 
         self.assertEqual(result, '[######--]')
+
+    def test_formats_elapsed_timetaken(self):
+        """
+        Checks runtime formatting with tenths-of-a-second precision.
+        """
+        result = format_elapsed_timetaken(3661.26)
+
+        self.assertEqual(result, '1:01:01.3')
 
 
 class TestParseArgs(unittest.TestCase):

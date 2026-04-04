@@ -55,6 +55,21 @@ def format_duration(seconds: float | None) -> str:
     return formatted_duration
 
 
+def format_elapsed_timetaken(seconds: float) -> str:
+    """
+    Formats elapsed runtime as hours:minutes:seconds with tenths precision.
+
+    Called by: build_output_data()
+    """
+    rounded_seconds: float = round(max(seconds, 0.0), 1)
+    hours: int = int(rounded_seconds // 3600)
+    remaining_seconds: float = rounded_seconds - (hours * 3600)
+    minutes: int = int(remaining_seconds // 60)
+    seconds_part: float = remaining_seconds - (minutes * 60)
+    formatted_timetaken: str = f'{hours}:{minutes:02d}:{seconds_part:04.1f}'
+    return formatted_timetaken
+
+
 def build_progress_bar(completed: int, total: int, width: int = PROGRESS_BAR_WIDTH) -> str:
     """
     Builds a fixed-width ASCII progress bar.
@@ -712,6 +727,7 @@ def build_output_data(
     collection_summary: list[dict[str, Any]],
     http_call_count: int,
     skipped_collections: list[dict[str, Any]],
+    elapsed_seconds: float,
 ) -> dict[str, Any]:
     """
     Builds the final pretty-printable JSON payload for stdout output.
@@ -721,6 +737,7 @@ def build_output_data(
     output_data: dict[str, Any] = {
         '_meta_': {
             'timestamp': datetime.now().astimezone().isoformat(),
+            'timetaken': format_elapsed_timetaken(elapsed_seconds),
             'requested_recent_items_count': requested_count,
             'items_returned': len(recent_items),
             'repository_items_found': num_found,
@@ -781,6 +798,7 @@ def main(argv: list[str] | None = None) -> int:
     http_call_count: dict[str, int] = {'count': 0}
     progress_enabled: bool = args.progress or (not args.no_progress and sys.stderr.isatty())
     progress_reporter = ProgressReporter(enabled=progress_enabled)
+    started_at: float = time.monotonic()
 
     with httpx.Client(headers=headers, transport=transport) as client:
         num_found, docs = fetch_recent_docs(
@@ -813,6 +831,7 @@ def main(argv: list[str] | None = None) -> int:
         collection_summary=collection_summary,
         http_call_count=http_call_count['count'],
         skipped_collections=skipped_collections,
+        elapsed_seconds=time.monotonic() - started_at,
     )
     print(json.dumps(output_data, indent=2, ensure_ascii=False))
     return 0
