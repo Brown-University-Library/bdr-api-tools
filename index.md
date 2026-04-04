@@ -15,6 +15,7 @@ For Brown community members, a recommendation: if you're off-campus, enable [Bro
 
 - calc_collection_size.py ([brief](#calc_collection_sizepy-brief)), ([detailed](#calc_collection_sizepy-detailed))
 - display_collection_activity.py ([brief](#display_collection_activitypy-brief)), ([detailed](#display_collection_activitypy-detailed))
+- display_recent_activity.py ([brief](#display_recent_activitypy-brief)), ([detailed](#display_recent_activitypy-detailed))
 - gather_extracted_text.py ([brief](#gather_extracted_textpy-brief)), ([detailed](#gather_extracted_textpy-detailed))
 - list_named_entities.py ([brief](#list_named_entitiespy-brief)), ([detailed](#list_named_entitiespy-detailed))
 - show_zip_info.py ([brief](#show_zip_infopy-brief)), ([detailed](#show_zip_infopy-detailed))
@@ -34,6 +35,12 @@ Calculates the total storage size of all items in the given BDR collection. It q
 ### display_collection_activity.py (brief)
 
 Displays monthly BDR collection activity counts as formatted JSON. It queries the Search API for collection members, buckets items by `deposit_date` month, and includes summary metadata such as collection title, counts of counted and skipped items, and HTTP-call totals.
+
+---
+
+### display_recent_activity.py (brief)
+
+Displays the most recently added BDR items as formatted JSON, and summarizes which collections those items belong to. It queries the Search API for recent items and their collection membership, fetches collection titles via the Collections API once per unique collection, and reports per-collection counts.
 
 ---
 
@@ -146,6 +153,60 @@ Output (excerpt):
 ```
 
 [Code](https://github.com/Brown-University-Library/bdr-api-tools/blob/main/display_collection_activity.py)
+
+---
+
+
+### display_recent_activity.py (detailed)
+
+Displays recent BDR repository activity as formatted JSON. It queries the Search API for the most recently added items, ordered by `deposit_date` descending, and asks that search response to include each item's collection membership. It then calls the Collections API once per unique collection represented in the recent item set to derive a display-ready collection title, including parent-collection context when available, and outputs per-collection counts.
+
+Args: --recent-items-count (optional; default `100`), --progress (optional), --no-progress (optional)
+
+Example usage:
+```
+uv run https://brown-university-library.github.io/bdr-api-tools/display_recent_activity.py --recent-items-count 100
+```
+
+Output (excerpt):
+```
+{
+  "_meta_": {
+    "timestamp": "2026-04-01T10:15:00.000000-04:00",
+    "timetaken": "0:00:12.4",
+    "requested_recent_items_count": 100,
+    "items_returned": 100,
+    "repository_items_found": 123456,
+    "collections_counted": 4,
+    "note": "Collection totals may exceed displayed items because an item may belong to multiple collections.",
+    "api_search_url": "https://repository.library.brown.edu/api/search/",
+    "api_collection_template": "https://repository.library.brown.edu/api/collections/{collection_pid}/",
+    "http_calls": 5
+  },
+  "collection_summary": [
+    {
+      "collection_pid": "bdr:bfttpwkj",
+      "collection_title": "`Theses and Dissertations` -- (from parent-collection `Computer Science`)",
+      "recent_item_count": 40
+    }
+  ],
+  "recent_items": [
+    {
+      "pid": "bdr:123456",
+      "primary_title": "Example Thesis Title",
+      "deposit_date": "2026-03-31T14:05:00Z",
+      "collections": [
+        {
+          "pid": "bdr:bfttpwkj",
+          "title": "`Theses and Dissertations` -- (from parent-collection `Computer Science`)"
+        }
+      ]
+    }
+  ]
+}
+```
+
+[Code](https://github.com/Brown-University-Library/bdr-api-tools/blob/main/display_recent_activity.py)
 
 ---
 
