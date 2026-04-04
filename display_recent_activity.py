@@ -791,17 +791,11 @@ def main(argv: list[str] | None = None) -> int:
     progress_reporter = ProgressReporter(enabled=progress_enabled)
 
     with httpx.Client(headers=headers, transport=transport) as client:
-        progress_reporter.start_stage('Search', detail='requesting recent items')
         num_found, docs = fetch_recent_docs(
             client,
             args.recent_items_count,
             http_call_count,
             progress_reporter=progress_reporter,
-        )
-        progress_reporter.finish(
-            completed=1,
-            total=1,
-            detail=f'found {len(docs)} items from {num_found} repository matches',
         )
         recent_items: list[dict[str, Any]] = build_recent_items(docs)
         progress_reporter.start_stage('Enrich', total=len(recent_items), detail='fetching item and collection details')
