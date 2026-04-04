@@ -26,7 +26,6 @@ from typing import Any
 import httpx
 
 SEARCH_BASE = 'https://repository.library.brown.edu/api/search/'
-ITEM_API_TEMPLATE = 'https://repository.library.brown.edu/api/items/{item_pid}/'
 COLLECTION_API_TEMPLATE = 'https://repository.library.brown.edu/api/collections/{collection_pid}/'
 DATE_FIELD = 'deposit_date'
 COLLECTION_MEMBERSHIP_FIELD = 'rel_is_member_of_collection_ssim'
@@ -353,28 +352,6 @@ def summarize_recent_doc(doc: dict[str, Any]) -> dict[str, Any]:
     return item_summary
 
 
-def build_item_url(item_pid: str) -> str:
-    """
-    Builds an item API URL for a PID.
-
-    Called by: fetch_item_json()
-    """
-    return ITEM_API_TEMPLATE.format(item_pid=item_pid)
-
-
-def fetch_item_json(client: httpx.Client, item_pid: str, http_call_count: dict[str, int]) -> dict[str, Any]:
-    """
-    Fetches item JSON from the BDR item API.
-
-    Called by: enrich_recent_items_with_collections()
-    """
-    increment_http_call_count(http_call_count)
-    response: httpx.Response = client.get(build_item_url(item_pid), timeout=30)
-    response.raise_for_status()
-    item_data: dict[str, Any] = response.json()
-    return item_data
-
-
 def choose_collection_pids(doc: dict[str, Any]) -> list[str]:
     """
     Chooses collection membership PIDs from a search doc.
@@ -431,94 +408,6 @@ def classify_http_status(exc: httpx.HTTPStatusError) -> int | None:
     if exc.response is not None:
         status_code = exc.response.status_code
     return status_code
-
-
-def extract_pid_from_value(raw_value: Any) -> str | None:
-    """
-    Extracts a collection PID from a string or dict-like relation value.
-
-    Called by: iter_collection_pids_from_field()
-    """
-    extracted_pid: str | None = None
-    if isinstance(raw_value, str):
-        stripped_value: str = raw_value.strip()
-        if PID_PATTERN.match(stripped_value):
-            extracted_pid = stripped_value
-        elif '/collections/' in stripped_value:
-            candidate_pid: str = stripped_value.rstrip('/').rsplit('/', 1)[-1]
-            if PID_PATTERN.match(candidate_pid):
-                extracted_pid = candidate_pid
-    elif isinstance(raw_value, dict):
-        for key in ('pid', 'id', 'collection_pid'):
-            nested_value: Any = raw_value.get(key)
-            if isinstance(nested_value, str) and PID_PATTERN.match(nested_value.strip()):
-                extracted_pid = nested_value.strip()
-                break
-        if extracted_pid is None:
-            for key in ('json_uri', 'uri'):
-                nested_value = raw_value.get(key)
-                if isinstance(nested_value, str) and '/collections/' in nested_value:
-                    candidate_pid = nested_value.rstrip('/').rsplit('/', 1)[-1]
-                    if PID_PATTERN.match(candidate_pid):
-                        extracted_pid = candidate_pid
-                        break
-    return extracted_pid
-
-
-def iter_collection_pids_from_field(raw_value: Any) -> list[str]:
-    """
-    Expands a membership field into normalized collection PIDs.
-
-    Called by: extract_collection_pids()
-    """
-    found_pids: list[str] = []
-    candidates: list[Any] = iter_candidate_values(raw_value)
-    for candidate in candidates:
-        extracted_pid: str | None = extract_pid_from_value(candidate)
-        if extracted_pid is not None:
-            found_pids.append(extracted_pid)
-    return found_pids
-
-
-def extract_collection_pids(item_json: dict[str, Any]) -> list[str]:
-    """
-    Extracts collection membership PIDs from an item JSON payload.
-
-    Called by: enrich_recent_items_with_collections()
-    """
-    collection_pids: list[str] = []
-    relations: Any = item_json.get('relations')
-    candidate_fields: list[Any] = []
-
-    if isinstance(relations, dict):
-        candidate_fields.extend(
-            [
-                relations.get('isMemberOfCollection'),
-                relations.get('is_member_of_collection'),
-                relations.get('memberOfCollection'),
-                relations.get('member_of_collection'),
-            ]
-        )
-
-    candidate_fields.extend(
-        [
-            item_json.get('isMemberOfCollection'),
-            item_json.get('is_member_of_collection'),
-            item_json.get('memberOfCollection'),
-            item_json.get('member_of_collection'),
-            item_json.get('collections'),
-            item_json.get('parent_folders'),
-        ]
-    )
-
-    seen: set[str] = set()
-    for raw_value in candidate_fields:
-        for collection_pid in iter_collection_pids_from_field(raw_value):
-            if collection_pid not in seen:
-                seen.add(collection_pid)
-                collection_pids.append(collection_pid)
-
-    return collection_pids
 
 
 def build_collection_title(collection_data: dict[str, Any]) -> str | None:

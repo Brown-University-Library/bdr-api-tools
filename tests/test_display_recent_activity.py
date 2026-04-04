@@ -10,7 +10,6 @@ from display_recent_activity import (
     choose_deposit_date,
     count_unique_collections,
     enrich_recent_items_with_collections,
-    extract_collection_pids,
     format_duration,
     format_elapsed_timetaken,
     parse_args,
@@ -41,45 +40,6 @@ class TestChooseDepositDate(unittest.TestCase):
         result = choose_deposit_date(doc)
 
         self.assertIsNone(result)
-
-
-class TestExtractCollectionPids(unittest.TestCase):
-    """
-    Tests collection-membership extraction behavior.
-    """
-
-    def test_extracts_collection_pids_from_relations_dicts(self):
-        """
-        Checks extraction from item JSON relations that contain PID dicts.
-        """
-        item_json = {
-            'relations': {
-                'isMemberOfCollection': [
-                    {'pid': 'bdr:alpha1'},
-                    {'id': 'bdr:beta2'},
-                    {'pid': 'bdr:alpha1'},
-                ]
-            }
-        }
-
-        result = extract_collection_pids(item_json)
-
-        self.assertEqual(result, ['bdr:alpha1', 'bdr:beta2'])
-
-    def test_extracts_collection_pids_from_parent_folder_uris(self):
-        """
-        Checks extraction from collection URIs present in parent_folders.
-        """
-        item_json = {
-            'parent_folders': [
-                {'json_uri': 'https://repository.library.brown.edu/api/collections/bdr:gamma3/'},
-                {'uri': 'https://repository.library.brown.edu/studio/collections/bdr:delta4/'},
-            ]
-        }
-
-        result = extract_collection_pids(item_json)
-
-        self.assertEqual(result, ['bdr:gamma3', 'bdr:delta4'])
 
 
 class TestChooseCollectionPids(unittest.TestCase):
