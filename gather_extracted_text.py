@@ -2,7 +2,7 @@
 # requires-python = "==3.12.*"
 # dependencies = [
 #   "httpx~=0.28.0",
-#   "humanize~=4.14.0"
+#   "humanize~=4.14.0",
 #   "tqdm~=4.67.0",
 # ]
 # ///
