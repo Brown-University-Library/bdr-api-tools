@@ -233,7 +233,8 @@ Args: `--collection-pid` (required), `--output-dir` (required), `--test-limit` (
 
 Example usage:
 ```
-uv run https://brown-university-library.github.io/bdr-api-tools/gather_extracted_text.py --collection-pid bdr:bfttpwkj --output-dir "../output_dir" --test-limit 2
+mkdir ./output_dir
+uv run https://brown-university-library.github.io/bdr-api-tools/gather_extracted_text.py --collection-pid bdr:bfttpwkj --output-dir "./output_dir" --test-limit 2
 ```
 
 Output:
