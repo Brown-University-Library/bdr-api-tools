@@ -239,7 +239,7 @@ uv run https://brown-university-library.github.io/bdr-api-tools/gather_extracted
 
 Output:
 ```
-% cd ../output_dir 
+% cd ./output_dir 
 
 % cd ./run-20250913T133756-0400-bdr_bfttpwkj 
 
